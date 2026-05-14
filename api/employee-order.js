@@ -71,14 +71,22 @@ export default async function handler(req, res) {
       items,
       pickupDate,
       stampedTunicPickupDate,
-      paymentMethod
+      paymentMethod,
+      paymentStatus
     } = body;
 
     const allowedPaymentMethods = ["Efectivo", "POS", "Transferencia"];
+    const allowedPaymentStatuses = ["pagado", "pendiente"];
 
     if (!allowedPaymentMethods.includes(paymentMethod)) {
       return res.status(400).json({
         error: "Método de pago inválido"
+      });
+    }
+
+    if (!allowedPaymentStatuses.includes(paymentStatus)) {
+      return res.status(400).json({
+        error: "Estado de pago inválido"
       });
     }
 
@@ -260,7 +268,7 @@ export default async function handler(req, res) {
           ? stampedTunicPickupDate
           : null,
         status: "no_entregado",
-        payment_status: "pagado",
+        payment_status: paymentStatus,
         payment_method: paymentMethod
       })
       .select()
@@ -334,7 +342,7 @@ export default async function handler(req, res) {
           .filter(Boolean)
           .join(" | "),
         status: "no_entregado",
-        paymentStatus: `pagado - ${paymentMethod}`,
+        paymentStatus: `${paymentStatus} - ${paymentMethod}`,
         paymentUrl: "",
         preferenceId: "",
         paymentId: ""

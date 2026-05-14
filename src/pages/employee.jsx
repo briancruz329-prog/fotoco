@@ -17,11 +17,20 @@ const CUADERNETA_GROUPS = [
   {
     title: "Tercer semestre",
     items: [
-      { match: "Química Analítica 1 Laboratorio", label: "Química Analítica 1 Laboratorio" },
-      { match: "Química Analítica 1 Teórico", label: "Química Analítica 1 Teórico" },
+      {
+        match: "Química Analítica 1 Laboratorio",
+        label: "Química Analítica 1 Laboratorio"
+      },
+      {
+        match: "Química Analítica 1 Teórico",
+        label: "Química Analítica 1 Teórico"
+      },
       { match: "Nomenclatura", label: "Nomenclatura" },
       { match: "Inorgánica Teórico", label: "Química Inorgánica Teórico" },
-      { match: "Inorgánica Laboratorio", label: "Química Inorgánica Laboratorio" },
+      {
+        match: "Inorgánica Laboratorio",
+        label: "Química Inorgánica Laboratorio"
+      },
       { match: "Matemática 05", label: "Matemática 05" },
       { match: "Física 102", label: "Física 102" },
       { match: "Carey", label: "Carey" },
@@ -31,12 +40,27 @@ const CUADERNETA_GROUPS = [
   {
     title: "Quinto semestre",
     items: [
-      { match: "Química Analítica 3 Laboratorio", label: "Química Analítica 3 Laboratorio" },
-      { match: "Química Analítica 3 Teórico", label: "Química Analítica 3 Teórico" },
-      { match: "Química Orgánica 103 Laboratorio", label: "Química Orgánica 103 Laboratorio" },
+      {
+        match: "Química Analítica 3 Laboratorio",
+        label: "Química Analítica 3 Laboratorio"
+      },
+      {
+        match: "Química Analítica 3 Teórico",
+        label: "Química Analítica 3 Teórico"
+      },
+      {
+        match: "Química Orgánica 103 Laboratorio",
+        label: "Química Orgánica 103 Laboratorio"
+      },
       { match: "Química Orgánica 104", label: "Orgánica 104" },
-      { match: "Fisicoquímica 103 Laboratorio", label: "Fisicoquímica 103 Laboratorio" },
-      { match: "Fisicoquímica 103 Teórico", label: "Fisicoquímica 103 Teórico" },
+      {
+        match: "Fisicoquímica 103 Laboratorio",
+        label: "Fisicoquímica 103 Laboratorio"
+      },
+      {
+        match: "Fisicoquímica 103 Teórico",
+        label: "Fisicoquímica 103 Teórico"
+      },
       { match: "Matemática 06", label: "Matemática 06" },
       { match: "Lehninger", label: "Lehninger" }
     ]
@@ -249,7 +273,7 @@ export default function Employee() {
     );
   });
 
-  async function submitOrder() {
+  async function submitOrder(paymentStatus) {
     if (cart.length === 0) {
       alert("El carrito está vacío");
       return;
@@ -299,7 +323,8 @@ export default function Employee() {
           items,
           pickupDate,
           stampedTunicPickupDate,
-          paymentMethod
+          paymentMethod,
+          paymentStatus
         })
       });
 
@@ -322,7 +347,11 @@ export default function Employee() {
         return;
       }
 
-      alert("Pedido creado correctamente. Total: $" + data.total);
+      if (paymentStatus === "pagado") {
+        alert("Pedido creado como pagado. Total: $" + data.total);
+      } else {
+        alert("Pedido creado como pendiente. Total: $" + data.total);
+      }
 
       clearOrder();
       await loadData();
@@ -660,22 +689,31 @@ export default function Employee() {
                 </div>
               )}
 
-              <button
-                onClick={submitOrder}
-                disabled={loading || cart.length === 0}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white p-4 rounded-xl font-bold"
-              >
-                {loading ? "Creando pedido..." : "Aceptar pedido"}
-              </button>
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => submitOrder("pagado")}
+                  disabled={loading || cart.length === 0}
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white p-4 rounded-xl font-bold"
+                >
+                  {loading ? "Creando pedido..." : "Pagar ahora"}
+                </button>
 
-              {cart.length > 0 && (
+                <button
+                  onClick={() => submitOrder("pendiente")}
+                  disabled={loading || cart.length === 0}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white p-4 rounded-xl font-bold"
+                >
+                  {loading ? "Creando pedido..." : "Pagar después"}
+                </button>
+
                 <button
                   onClick={clearOrder}
-                  className="w-full bg-zinc-200 hover:bg-zinc-300 text-zinc-800 p-3 rounded-xl font-bold"
+                  disabled={loading || cart.length === 0}
+                  className="w-full bg-zinc-200 hover:bg-zinc-300 disabled:bg-zinc-100 disabled:text-zinc-400 text-zinc-800 p-3 rounded-xl font-bold"
                 >
                   Vaciar pedido
                 </button>
-              )}
+              </div>
             </div>
           </aside>
         </div>
