@@ -12,21 +12,21 @@ export default async function handler(req, res) {
 
     const body = getBody(req);
 
-    const { id, pickup_date, capacity, active } = body;
+    const { id, pickup_date, active } = body;
 
     if (id) {
       const patch = {};
-
-      if (capacity !== undefined) {
-        patch.capacity = Number(capacity);
-      }
 
       if (active !== undefined) {
         patch.active = Boolean(active);
       }
 
+      if (pickup_date !== undefined) {
+        patch.pickup_date = pickup_date;
+      }
+
       const { error } = await supabaseAdmin
-        .from("pickup_slots")
+        .from("stamped_tunic_slots")
         .update(patch)
         .eq("id", id);
 
@@ -46,11 +46,9 @@ export default async function handler(req, res) {
       });
     }
 
-    const { error } = await supabaseAdmin.from("pickup_slots").upsert(
+    const { error } = await supabaseAdmin.from("stamped_tunic_slots").upsert(
       {
         pickup_date,
-        capacity: Number(capacity || 25),
-        reserved: 0,
         active: active !== false
       },
       {
@@ -67,10 +65,10 @@ export default async function handler(req, res) {
       created: true
     });
   } catch (error) {
-    console.error("ERROR admin-update-slot:", error);
+    console.error("ERROR admin-update-stamped-slot:", error);
 
     return res.status(500).json({
-      error: error.message || "Error actualizando cupo"
+      error: error.message || "Error actualizando día de túnica estampada"
     });
   }
 }

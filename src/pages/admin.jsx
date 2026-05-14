@@ -9,9 +9,12 @@ export default function Admin() {
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
+  const [stampedTunicSlots, setStampedTunicSlots] = useState([]);
 
   const [newSlotDate, setNewSlotDate] = useState("");
   const [newSlotCapacity, setNewSlotCapacity] = useState(25);
+
+  const [newStampedDate, setNewStampedDate] = useState("");
 
   useEffect(() => {
     init();
@@ -48,7 +51,7 @@ export default function Admin() {
 
     try {
       data = JSON.parse(text);
-    } catch (error) {
+    } catch {
       console.error("Respuesta no JSON:", text);
       throw new Error("La API no respondió JSON. Revisá si la ruta existe.");
     }
@@ -67,7 +70,17 @@ export default function Admin() {
       }
     });
 
-    const data = await response.json();
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("Respuesta no JSON admin-data:", text);
+      alert("La API admin-data no respondió JSON");
+      return;
+    }
 
     if (!response.ok) {
       alert(data.error || "No autorizado");
@@ -80,11 +93,16 @@ export default function Admin() {
     setItems(data.items || []);
     setProducts(data.products || []);
     setSlots(data.slots || []);
+    setStampedTunicSlots(data.stampedTunicSlots || []);
   }
 
   async function logout() {
     await supabase.auth.signOut();
     window.location.href = "/";
+  }
+
+  async function refresh() {
+    await loadAdminData();
   }
 
   async function updateProduct(product, patch) {
@@ -143,6 +161,44 @@ export default function Admin() {
     }
   }
 
+  async function updateStampedSlot(slot, patch) {
+    try {
+      await apiFetch("/api/admin-update-stamped-slot", {
+        method: "POST",
+        body: JSON.stringify({
+          id: slot.id,
+          ...patch
+        })
+      });
+
+      await loadAdminData();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function createStampedSlot() {
+    if (!newStampedDate) {
+      alert("Elegí una fecha para túnica estampada");
+      return;
+    }
+
+    try {
+      await apiFetch("/api/admin-update-stamped-slot", {
+        method: "POST",
+        body: JSON.stringify({
+          pickup_date: newStampedDate,
+          active: true
+        })
+      });
+
+      setNewStampedDate("");
+      await loadAdminData();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
   async function updateOrder(order, patch) {
     try {
       await apiFetch("/api/admin-update-order", {
@@ -162,7 +218,23 @@ export default function Admin() {
   function orderProducts(orderId) {
     return items
       .filter((item) => item.order_id === orderId)
-      .map((item) => item.product_name)
+      .map((item) => {
+        const extra = [];
+
+        if (item.talle) {
+          extra.push("Talle " + item.talle);
+        }
+
+        if (item.entallada) {
+          extra.push("Entallada: " + item.entallada);
+        }
+
+        if (extra.length > 0) {
+          return `${item.product_name} (${extra.join(", ")})`;
+        }
+
+        return item.product_name;
+      })
       .join(", ");
   }
 
@@ -183,11 +255,18 @@ export default function Admin() {
               Panel empleados AEQ
             </h1>
             <p className="text-zinc-600">
-              Editar pedidos, productos, stock y cupos.
+              Editar pedidos, productos, stock y fechas de retiro.
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={refresh}
+              className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold"
+            >
+              Actualizar
+            </button>
+
             <a href="/" className="bg-zinc-200 px-4 py-3 rounded-xl font-bold">
               Ver tienda
             </a>
@@ -242,16 +321,16 @@ export default function Admin() {
                       {orderProducts(order.id)}
 
                       {order.pickup_date && (
-  <p className="text-orange-500 font-bold">
-    Cuaderneta: {order.pickup_date}
-  </p>
-)}
+                        <p className="text-orange-500 font-bold mt-1">
+                          Cuaderneta: {order.pickup_date}
+                        </p>
+                      )}
 
-{order.stamped_tunic_pickup_date && (
-  <p className="text-orange-500 font-bold">
-    Túnica estampada: {order.stamped_tunic_pickup_date}
-  </p>
-)}
+                      {order.stamped_tunic_pickup_date && (
+                        <p className="text-orange-500 font-bold">
+                          Túnica estampada: {order.stamped_tunic_pickup_date}
+                        </p>
+                      )}
                     </td>
 
                     <td className="p-2 font-bold">${order.total}</td>
@@ -303,6 +382,14 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
+
+                {orders.length === 0 && (
+                  <tr>
+                    <td className="p-4 text-zinc-500" colSpan="8">
+                      No hay pedidos.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -385,7 +472,7 @@ export default function Admin() {
                     <td className="p-2">
                       <input
                         type="checkbox"
-                        checked={product.active}
+                        checked={Boolean(product.active)}
                         onChange={(e) =>
                           updateProduct(product, { active: e.target.checked })
                         }
@@ -399,9 +486,14 @@ export default function Admin() {
         </section>
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
-          <h2 className="text-2xl font-black text-orange-500 mb-4">
-            Cupos de cuadernetas
+          <h2 className="text-2xl font-black text-orange-500 mb-2">
+            Fechas de cuadernetas
           </h2>
+
+          <p className="text-zinc-600 mb-4">
+            La tienda genera automáticamente fechas desde pasado mañana hasta una semana adelante.
+            Desde acá podés cambiar cupo o activar/desactivar días.
+          </p>
 
           <div className="flex gap-3 mb-5 flex-wrap">
             <input
@@ -431,7 +523,7 @@ export default function Admin() {
               <thead>
                 <tr className="text-left border-b">
                   <th className="p-2">Fecha</th>
-                  <th className="p-2">Cupo</th>
+                  <th className="p-2">Cupo máximo</th>
                   <th className="p-2">Reservados</th>
                   <th className="p-2">Disponibles</th>
                   <th className="p-2">Activo</th>
@@ -457,6 +549,7 @@ export default function Admin() {
                     </td>
 
                     <td className="p-2">{slot.reserved}</td>
+
                     <td className="p-2">
                       {Number(slot.capacity) - Number(slot.reserved)}
                     </td>
@@ -464,7 +557,7 @@ export default function Admin() {
                     <td className="p-2">
                       <input
                         type="checkbox"
-                        checked={slot.active}
+                        checked={Boolean(slot.active)}
                         onChange={(e) =>
                           updateSlot(slot, { active: e.target.checked })
                         }
@@ -472,6 +565,91 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
+
+                {slots.length === 0 && (
+                  <tr>
+                    <td className="p-4 text-zinc-500" colSpan="5">
+                      No hay fechas de cuadernetas.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-3xl shadow p-6 mb-8">
+          <h2 className="text-2xl font-black text-orange-500 mb-2">
+            Fechas de túnicas estampadas
+          </h2>
+
+          <p className="text-zinc-600 mb-4">
+            Estas fechas son independientes de las cuadernetas y no tienen cupo.
+            Solo se muestran en la tienda si están activas.
+          </p>
+
+          <div className="flex gap-3 mb-5 flex-wrap">
+            <input
+              type="date"
+              value={newStampedDate}
+              onChange={(e) => setNewStampedDate(e.target.value)}
+              className="border rounded-xl p-3"
+            />
+
+            <button
+              onClick={createStampedSlot}
+              className="bg-orange-500 text-white px-5 py-3 rounded-xl font-bold"
+            >
+              Agregar fecha túnica estampada
+            </button>
+          </div>
+
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b">
+                  <th className="p-2">Fecha</th>
+                  <th className="p-2">Activo</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {stampedTunicSlots.map((slot) => (
+                  <tr key={slot.id} className="border-b">
+                    <td className="p-2">
+                      <input
+                        type="date"
+                        defaultValue={slot.pickup_date}
+                        className="border rounded-lg p-2"
+                        onBlur={(e) =>
+                          updateStampedSlot(slot, {
+                            pickup_date: e.target.value
+                          })
+                        }
+                      />
+                    </td>
+
+                    <td className="p-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(slot.active)}
+                        onChange={(e) =>
+                          updateStampedSlot(slot, {
+                            active: e.target.checked
+                          })
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+
+                {stampedTunicSlots.length === 0 && (
+                  <tr>
+                    <td className="p-4 text-zinc-500" colSpan="2">
+                      No hay fechas para túnicas estampadas.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

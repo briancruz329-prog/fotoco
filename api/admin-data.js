@@ -1,8 +1,63 @@
 import { requireEmployee, supabaseAdmin } from "./adminAuth.js";
 
+function todayISOInUruguay() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function addDaysISO(dateISO, days) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function upcomingCuadernetaDates() {
+  const today = todayISOInUruguay();
+  const dates = [];
+
+  for (let i = 2; i <= 7; i++) {
+    dates.push(addDaysISO(today, i));
+  }
+
+  return dates;
+}
+
+async function ensureUpcomingPickupSlots() {
+  const dates = upcomingCuadernetaDates();
+
+  const rows = dates.map((date) => ({
+    pickup_date: date,
+    capacity: 25,
+    reserved: 0,
+    active: true
+  }));
+
+  const { error } = await supabaseAdmin
+    .from("pickup_slots")
+    .upsert(rows, {
+      onConflict: "pickup_date",
+      ignoreDuplicates: true
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return dates;
+}
+
 export default async function handler(req, res) {
   try {
     await requireEmployee(req);
+
+    const today = todayISOInUruguay();
+
+    await ensureUpcomingPickupSlots();
 
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
@@ -24,8 +79,8 @@ export default async function handler(req, res) {
     const { data: products, error: productsError } = await supabaseAdmin
       .from("products")
       .select("*")
-      .order("category")
-      .order("name");
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
 
     if (productsError) {
       throw productsError;
@@ -34,21 +89,36 @@ export default async function handler(req, res) {
     const { data: slots, error: slotsError } = await supabaseAdmin
       .from("pickup_slots")
       .select("*")
+      .gte("pickup_date", today)
       .order("pickup_date", { ascending: true });
 
     if (slotsError) {
       throw slotsError;
     }
 
+    const { data: stampedTunicSlots, error: stampedSlotsError } =
+      await supabaseAdmin
+        .from("stamped_tunic_slots")
+        .select("*")
+        .gte("pickup_date", today)
+        .order("pickup_date", { ascending: true });
+
+    if (stampedSlotsError) {
+      throw stampedSlotsError;
+    }
+
     return res.status(200).json({
-      orders,
-      items,
-      products,
-      slots
+      orders: orders || [],
+      items: items || [],
+      products: products || [],
+      slots: slots || [],
+      stampedTunicSlots: stampedTunicSlots || []
     });
   } catch (error) {
+    console.error("ERROR admin-data:", error);
+
     return res.status(401).json({
-      error: error.message
+      error: error.message || "No autorizado"
     });
   }
 }
