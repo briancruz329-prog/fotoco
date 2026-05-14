@@ -22,24 +22,12 @@ export default function PublicShop() {
   }, []);
 
 async function loadData() {
-  console.log("Cargando datos...");
-  console.log("URL:", import.meta.env.VITE_SUPABASE_URL);
-  console.log("KEY cargada:", !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
-
   const { data: productsData, error: productsError } = await supabase
     .from("products")
     .select("*");
 
-  console.log("PRODUCTOS DATA:", productsData);
-  console.log("PRODUCTOS ERROR:", productsError);
-
   if (productsError) {
-    alert(
-      "Error cargando productos: " +
-      productsError.message +
-      " | Code: " +
-      productsError.code
-    );
+    alert("Error cargando productos");
     return;
   }
 
@@ -47,20 +35,10 @@ async function loadData() {
     .from("pickup_slots")
     .select("*");
 
-  console.log("CUPOS DATA:", slotsData);
-  console.log("CUPOS ERROR:", slotsError);
-
   if (slotsError) {
-    alert(
-      "Error cargando cupos: " +
-      slotsError.message +
-      " | Code: " +
-      slotsError.code
-    );
+    alert("Error cargando cupos");
     return;
   }
-
-  alert("Productos recibidos: " + (productsData ? productsData.length : 0));
 
   setProducts(productsData || []);
 
