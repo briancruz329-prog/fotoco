@@ -376,19 +376,11 @@ export default function PublicShop() {
                         ${product.price}
                       </p>
 
-                      <p
-                        className={
-                          sinStock
-                            ? "text-sm text-red-500 font-bold"
-                            : "text-sm text-zinc-500"
-                        }
-                      >
-                        {product.category === "cuaderneta"
-                          ? "Cupo diario compartido"
-                          : sinStock
-                            ? "Sin stock"
-                            : "Stock disponible: " + remaining}
-                      </p>
+                      {sinStock && (
+                        <p className="text-sm text-red-500 font-bold">
+                          Sin stock
+                        </p>
+                      )}
                     </div>
 
                     <button
