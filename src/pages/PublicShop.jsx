@@ -23,8 +23,11 @@ export default function PublicShop() {
 
 async function loadData() {
   const { data: productsData, error: productsError } = await supabase
-    .from("products")
-    .select("*");
+  .from("products")
+  .select("*")
+  .eq("active", true)
+  .order("category", { ascending: true })
+  .order("name", { ascending: true });
 
   if (productsError) {
     alert("Error cargando productos");
