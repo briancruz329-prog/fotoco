@@ -59,6 +59,20 @@ function normalizeText(text) {
     .trim();
 }
 
+function formatDateDDMM(dateISO) {
+  if (!dateISO) return "";
+
+  const parts = String(dateISO).split("-");
+
+  if (parts.length !== 3) {
+    return dateISO;
+  }
+
+  const [, month, day] = parts;
+
+  return `${day}-${month}`;
+}
+
 export default function PublicShop() {
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
@@ -167,6 +181,7 @@ export default function PublicShop() {
     }
 
     const inCart = cart.filter((item) => item.id === product.id).length;
+
     return Number(product.stock || 0) - inCart;
   }
 
@@ -650,7 +665,7 @@ export default function PublicShop() {
 
                     {slots.map((slot) => (
                       <option key={slot.id} value={slot.pickup_date}>
-                        {slot.pickup_date}
+                        {formatDateDDMM(slot.pickup_date)}
                       </option>
                     ))}
                   </select>
@@ -676,7 +691,7 @@ export default function PublicShop() {
 
                     {stampedTunicSlots.map((slot) => (
                       <option key={slot.id} value={slot.pickup_date}>
-                        {slot.pickup_date}
+                        {formatDateDDMM(slot.pickup_date)}
                       </option>
                     ))}
                   </select>
