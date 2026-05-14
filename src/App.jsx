@@ -1,6 +1,6 @@
 import PublicShop from "./pages/PublicShop";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
+import Login from "./pages/login";
+import Admin from "./pages/admin";
 
 export default function App() {
   const path = window.location.pathname;
