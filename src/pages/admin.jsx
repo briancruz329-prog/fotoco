@@ -200,6 +200,25 @@ export default function Admin() {
   }
 
   async function updateOrder(order, patch) {
+    const vaARechazar = patch.payment_status === "rechazado";
+    const vaAEntregar = patch.status === "entregado";
+
+    if (vaARechazar) {
+      const ok = window.confirm(
+        "Esto eliminará el pedido, devolverá stock y liberará el cupo de cuaderneta si corresponde. ¿Confirmás que el pago fue rechazado?"
+      );
+
+      if (!ok) return;
+    }
+
+    if (vaAEntregar) {
+      const ok = window.confirm(
+        "Esto marcará el pedido como entregado y lo eliminará de la lista. No se devolverá stock ni cupo. ¿Confirmás?"
+      );
+
+      if (!ok) return;
+    }
+
     try {
       await apiFetch("/api/admin-update-order", {
         method: "POST",
@@ -236,6 +255,17 @@ export default function Admin() {
         return item.product_name;
       })
       .join(", ");
+  }
+
+  function formatStatus(status) {
+    if (status === "entregado") return "Entregado";
+    return "No Entregado";
+  }
+
+  function formatPaymentStatus(status) {
+    if (status === "pagado") return "Pagado";
+    if (status === "rechazado") return "Rechazado";
+    return "Pendiente";
   }
 
   if (loading) {
@@ -282,8 +312,13 @@ export default function Admin() {
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
           <h2 className="text-2xl font-black text-orange-500 mb-4">
-            Pedidos no entregados
+            Pedidos activos
           </h2>
+
+          <p className="text-zinc-600 mb-4">
+            Si marcás un pedido como <b>Rechazado</b>, se elimina y devuelve stock/cupo.
+            Si lo marcás como <b>Entregado</b>, se elimina sin devolver stock/cupo.
+          </p>
 
           <div className="overflow-auto">
             <table className="w-full text-sm">
@@ -294,8 +329,9 @@ export default function Admin() {
                   <th className="p-2">Celular</th>
                   <th className="p-2">Productos</th>
                   <th className="p-2">Total</th>
-                  <th className="p-2">Método de pago</th>
-                  <th className="p-2">Estado</th>
+                  <th className="p-2">Pago</th>
+                  <th className="p-2">Entrega</th>
+                  <th className="p-2">Método</th>
                   <th className="p-2">Link</th>
                 </tr>
               </thead>
@@ -337,22 +373,20 @@ export default function Admin() {
 
                     <td className="p-2">
                       <select
-                        value={order.payment_method || "Mercado Pago"}
+                        value={order.payment_status || "pendiente"}
                         onChange={(e) =>
-                          updateOrder(order, { payment_method: e.target.value })
+                          updateOrder(order, { payment_status: e.target.value })
                         }
                         className="border rounded-lg p-2"
                       >
-                        <option value="Mercado Pago">Mercado Pago</option>
-                        <option value="Efectivo">Efectivo</option>
-                        <option value="POS">POS</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="pagado">Pagado</option>
+                        <option value="rechazado">Rechazado</option>
                       </select>
 
-                      {order.payment_status && (
-                        <p className="text-xs text-zinc-500 mt-1">
-                          Estado MP: {order.payment_status}
-                        </p>
-                      )}
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Actual: {formatPaymentStatus(order.payment_status)}
+                      </p>
                     </td>
 
                     <td className="p-2">
@@ -365,6 +399,24 @@ export default function Admin() {
                       >
                         <option value="no_entregado">No Entregado</option>
                         <option value="entregado">Entregado</option>
+                      </select>
+
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Actual: {formatStatus(order.status)}
+                      </p>
+                    </td>
+
+                    <td className="p-2">
+                      <select
+                        value={order.payment_method || "Mercado Pago"}
+                        onChange={(e) =>
+                          updateOrder(order, { payment_method: e.target.value })
+                        }
+                        className="border rounded-lg p-2"
+                      >
+                        <option value="Mercado Pago">Mercado Pago</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="POS">POS</option>
                       </select>
                     </td>
 
@@ -385,8 +437,8 @@ export default function Admin() {
 
                 {orders.length === 0 && (
                   <tr>
-                    <td className="p-4 text-zinc-500" colSpan="8">
-                      No hay pedidos no entregados.
+                    <td className="p-4 text-zinc-500" colSpan="9">
+                      No hay pedidos activos.
                     </td>
                   </tr>
                 )}
