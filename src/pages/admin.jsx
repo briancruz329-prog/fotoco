@@ -417,6 +417,7 @@ export default function Admin() {
                         <option value="Mercado Pago">Mercado Pago</option>
                         <option value="Efectivo">Efectivo</option>
                         <option value="POS">POS</option>
+                        <option value="Transferencia">Transferencia</option>
                       </select>
                     </td>
 
