@@ -86,11 +86,10 @@ export default function PublicShop() {
     setCart([]);
   }
 
-  const filteredProducts = products.filter((product) => {
-    const sameCategory = product.category === category;
-    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-    return sameCategory && matchesSearch;
-  });
+const filteredProducts = products.filter((product) => {
+  const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
+  return matchesSearch;
+});
 
   const total = cart.reduce((sum, product) => {
     return sum + Number(product.price);
