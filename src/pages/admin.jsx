@@ -290,24 +290,28 @@ export default function Admin() {
           </div>
 
           <div className="flex gap-3 flex-wrap">
-            <button
-              onClick={refresh}
-              className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold"
-            >
-              Actualizar
-            </button>
+  <button
+    onClick={refresh}
+    className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold"
+  >
+    Actualizar
+  </button>
 
-            <a href="/" className="bg-zinc-200 px-4 py-3 rounded-xl font-bold">
-              Ver tienda
-            </a>
+  <a href="/employee" className="bg-orange-100 text-orange-600 px-4 py-3 rounded-xl font-bold">
+    Crear pedido
+  </a>
 
-            <button
-              onClick={logout}
-              className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold"
-            >
-              Salir
-            </button>
-          </div>
+  <a href="/" className="bg-zinc-200 px-4 py-3 rounded-xl font-bold">
+    Ver tienda
+  </a>
+
+  <button
+    onClick={logout}
+    className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold"
+  >
+    Salir
+  </button>
+</div>
         </header>
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
