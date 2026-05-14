@@ -192,7 +192,7 @@ const filteredProducts = products.filter((product) => {
 
       <div className="max-w-7xl mx-auto p-6">
         <header id="top" className="text-center py-10">
-          <img src="/logo-aeq.png" alt="AEQ" className="h-24 mx-auto mb-5" />
+          <img src="/logo-aeq.jpg" alt="AEQ" className="h-24 mx-auto mb-5" />
 
           <h1 className="text-5xl md:text-7xl font-black text-orange-500 tracking-tight">
             FOTOCOPIADORA AEQ
