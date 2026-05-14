@@ -242,10 +242,16 @@ export default function Admin() {
                       {orderProducts(order.id)}
 
                       {order.pickup_date && (
-                        <p className="text-orange-500 font-bold">
-                          Retiro: {order.pickup_date}
-                        </p>
-                      )}
+  <p className="text-orange-500 font-bold">
+    Cuaderneta: {order.pickup_date}
+  </p>
+)}
+
+{order.stamped_tunic_pickup_date && (
+  <p className="text-orange-500 font-bold">
+    Túnica estampada: {order.stamped_tunic_pickup_date}
+  </p>
+)}
                     </td>
 
                     <td className="p-2 font-bold">${order.total}</td>

@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   try {
     const body = leerBody(req);
 
-    const { customerName, customerPhone, customerEmail, items, pickupDate } =
+    const { customerName, customerPhone, customerEmail, items, pickupDate, stampedTunicPickupDate } =
       body;
 
     if (!customerName || !customerPhone || !customerEmail) {
@@ -82,11 +82,26 @@ export default async function handler(req, res) {
       return product.category === "cuaderneta";
     });
 
+    const hasTunicaEstampada = items.some((item) => {
+  const product = productMap.get(item.name);
+
+  return (
+    product.category === "tunica" &&
+    product.name.toLowerCase().includes("estampada")
+  );
+});
+
     if (hasCuaderneta && !pickupDate) {
       return res.status(400).json({
         error: "Falta seleccionar fecha de retiro de cuaderneta"
       });
     }
+    
+    if (hasTunicaEstampada && !stampedTunicPickupDate) {
+  return res.status(400).json({
+    error: "Falta seleccionar fecha de retiro de túnica estampada"
+  });
+}
 
     for (const [productName, quantity] of Object.entries(counts)) {
       const product = productMap.get(productName);
@@ -121,15 +136,34 @@ export default async function handler(req, res) {
       const capacity = Number(slotData.capacity || 0);
       const reserved = Number(slotData.reserved || 0);
 
-      if (reserved + 1 > capacity) {
+      if (reserved >= capacity) {
         return res.status(400).json({
-          error: "Cupo completo para esa fecha"
+          error: "Cupo completo de cuadernetas para esa fecha"
         });
       }
 
       slot = slotData;
     }
 
+    let stampedTunicSlot = null;
+
+if (hasTunicaEstampada) {
+  const { data: stampedSlotData, error: stampedSlotError } =
+    await supabaseAdmin
+      .from("stamped_tunic_slots")
+      .select("*")
+      .eq("pickup_date", stampedTunicPickupDate)
+      .eq("active", true)
+      .single();
+
+  if (stampedSlotError || !stampedSlotData) {
+    return res.status(400).json({
+      error: "La fecha seleccionada para túnica estampada no está disponible"
+    });
+  }
+
+  stampedTunicSlot = stampedSlotData;
+}
     let total = 0;
 
     const orderItems = items.map((item) => {
@@ -162,6 +196,7 @@ export default async function handler(req, res) {
         customer_email: customerEmail,
         total,
         pickup_date: hasCuaderneta ? pickupDate : null,
+stamped_tunic_pickup_date: hasTunicaEstampada ? stampedTunicPickupDate : null,
         status: "esperando_pago",
         payment_status: "pendiente"
       })
@@ -288,7 +323,12 @@ export default async function handler(req, res) {
         customerEmail,
         productos: orderItems.map((item) => item.product_name).join(", "),
         total,
-        pickupDate: hasCuaderneta ? pickupDate : "",
+        pickupDate: [
+  hasCuaderneta ? `Cuaderneta: ${pickupDate}` : "",
+  hasTunicaEstampada ? `Túnica estampada: ${stampedTunicPickupDate}` : ""
+]
+  .filter(Boolean)
+  .join(" | "),
         status: "esperando_pago",
         paymentStatus: "pendiente",
         paymentUrl: mpData.init_point,

@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 export default function PublicShop() {
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
+  const [stampedTunicSlots, setStampedTunicSlots] = useState([]);
   const [cart, setCart] = useState([]);
   const [category, setCategory] = useState("cuaderneta");
   const [search, setSearch] = useState("");
@@ -12,6 +13,7 @@ export default function PublicShop() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [pickupDate, setPickupDate] = useState("");
+  const [stampedTunicPickupDate, setStampedTunicPickupDate] = useState("");
   const [talle, setTalle] = useState("");
   const [entallada, setEntallada] = useState("");
 
@@ -34,6 +36,17 @@ export default function PublicShop() {
       alert("Error cargando productos");
       return;
     }
+    const { data: stampedSlotsData, error: stampedSlotsError } = await supabase
+      .from("stamped_tunic_slots")
+      .select("*")
+      .eq("active", true)
+      .order("pickup_date", { ascending: true });
+
+    if (stampedSlotsError) {
+      console.error(stampedSlotsError);
+      alert("Error cargando días de túnicas estampadas");
+      return;
+    }
 
     const { data: slotsData, error: slotsError } = await supabase
       .from("pickup_slots")
@@ -54,6 +67,7 @@ export default function PublicShop() {
     });
 
     setSlots(availableSlots);
+    setStampedTunicSlots(stampedSlotsData || []);
   }
 
   function productStockRemaining(product) {
@@ -100,7 +114,17 @@ export default function PublicShop() {
   }, 0);
 
   const hasTunica = cart.some((product) => product.category === "tunica");
-  const hasCuaderneta = cart.some((product) => product.category === "cuaderneta");
+
+const hasCuaderneta = cart.some((product) => {
+  return product.category === "cuaderneta";
+});
+
+const hasTunicaEstampada = cart.some((product) => {
+  return (
+    product.category === "tunica" &&
+    product.name.toLowerCase().includes("estampada")
+  );
+});
 
   async function checkout() {
     if (cart.length === 0) {
@@ -117,7 +141,10 @@ export default function PublicShop() {
       alert("Seleccioná una fecha para retirar la cuaderneta");
       return;
     }
-
+    if (hasTunicaEstampada && !stampedTunicPickupDate) {
+      alert("Seleccioná una fecha para retirar la túnica estampada");
+      return;
+    }
     if (hasTunica && (!talle || !entallada)) {
       alert("Completá talle y si la túnica es entallada");
       return;
@@ -144,7 +171,8 @@ export default function PublicShop() {
           customerPhone,
           customerEmail,
           items,
-          pickupDate
+          pickupDate,
+          stampedTunicPickupDate
         })
       });
 
@@ -442,31 +470,57 @@ export default function PublicShop() {
               )}
 
               {hasCuaderneta && (
-                <div className="border border-orange-200 rounded-2xl p-4 bg-orange-50">
-                  <p className="font-black text-orange-500 mb-3">
-                    Fecha de retiro de cuaderneta
-                  </p>
+  <div className="border border-orange-200 rounded-2xl p-4 bg-orange-50">
+    <p className="font-black text-orange-500 mb-3">
+      Fecha de retiro de cuaderneta
+    </p>
 
-                  <select
-                    value={pickupDate}
-                    onChange={(e) => setPickupDate(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3"
-                  >
-                    <option value="">Seleccionar fecha</option>
+    <select
+      value={pickupDate}
+      onChange={(e) => setPickupDate(e.target.value)}
+      className="w-full border rounded-xl px-4 py-3"
+    >
+      <option value="">Seleccionar fecha</option>
 
-                    {slots.map((slot) => (
-                      <option key={slot.id} value={slot.pickup_date}>
-                        {slot.pickup_date} —{" "}
-                        {Number(slot.capacity) - Number(slot.reserved)} cupos
-                      </option>
-                    ))}
-                  </select>
+      {slots.map((slot) => (
+        <option key={slot.id} value={slot.pickup_date}>
+          {slot.pickup_date} —{" "}
+          {Number(slot.capacity) - Number(slot.reserved)} cupos disponibles
+        </option>
+      ))}
+    </select>
 
-                  <p className="text-sm text-zinc-600 mt-2">
-                    Las cuadernetas comparten cupo diario entre todas las materias.
-                  </p>
-                </div>
-              )}
+    <p className="text-sm text-zinc-600 mt-2">
+      Las cuadernetas ocupan 1 cupo diario por pedido.
+    </p>
+  </div>
+)}
+
+{hasTunicaEstampada && (
+  <div className="border border-orange-200 rounded-2xl p-4 bg-orange-50">
+    <p className="font-black text-orange-500 mb-3">
+      Fecha de retiro de túnica estampada
+    </p>
+
+    <select
+      value={stampedTunicPickupDate}
+      onChange={(e) => setStampedTunicPickupDate(e.target.value)}
+      className="w-full border rounded-xl px-4 py-3"
+    >
+      <option value="">Seleccionar fecha</option>
+
+      {stampedTunicSlots.map((slot) => (
+        <option key={slot.id} value={slot.pickup_date}>
+          {slot.pickup_date}
+        </option>
+      ))}
+    </select>
+
+    <p className="text-sm text-zinc-600 mt-2">
+      Las túnicas estampadas tienen días de retiro propios y no ocupan cupo de cuadernetas.
+    </p>
+  </div>
+)}
 
               <button
                 onClick={checkout}
