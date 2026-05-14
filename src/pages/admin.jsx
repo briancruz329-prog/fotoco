@@ -31,25 +31,37 @@ export default function Admin() {
   }
 
   async function apiFetch(url, options = {}) {
-    const token = session?.access_token;
+  const token = session?.access_token;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {})
-      }
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Error");
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {})
     }
+  });
 
-    return data;
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    console.error("Respuesta no JSON:", text);
+
+    throw new Error(
+      "La API no respondió JSON. Probablemente la ruta no existe o Vercel devolvió 404."
+    );
   }
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error en servidor");
+  }
+
+  return data;
+}
 
   async function loadAdminData(token = session?.access_token) {
     const response = await fetch("/api/admin-data", {
@@ -168,13 +180,13 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-orange-50 p-6 text-zinc-900">
       <div className="max-w-7xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
+        <header className="flex flex-col md:flex-row justify-between gap-4 md:items-center mb-8">
           <div>
             <h1 className="text-4xl font-black text-orange-500">
               Panel empleados AEQ
             </h1>
             <p className="text-zinc-600">
-              Pedidos, stock, precios y cupos.
+              Desde acá se editan pedidos, productos, stock y cupos directamente en Supabase.
             </p>
           </div>
 
@@ -183,7 +195,10 @@ export default function Admin() {
               Ver tienda
             </a>
 
-            <button onClick={logout} className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold">
+            <button
+              onClick={logout}
+              className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold"
+            >
               Salir
             </button>
           </div>
@@ -205,7 +220,7 @@ export default function Admin() {
                   <th className="p-2">Total</th>
                   <th className="p-2">Pago</th>
                   <th className="p-2">Estado</th>
-                  <th className="p-2">Acciones</th>
+                  <th className="p-2">Link</th>
                 </tr>
               </thead>
 
@@ -226,6 +241,7 @@ export default function Admin() {
 
                     <td className="p-2">
                       {orderProducts(order.id)}
+
                       {order.pickup_date && (
                         <p className="text-orange-500 font-bold">
                           Retiro: {order.pickup_date}
@@ -237,8 +253,10 @@ export default function Admin() {
 
                     <td className="p-2">
                       <select
-                        value={order.payment_status}
-                        onChange={(e) => updateOrder(order, { payment_status: e.target.value })}
+                        value={order.payment_status || "pendiente"}
+                        onChange={(e) =>
+                          updateOrder(order, { payment_status: e.target.value })
+                        }
                         className="border rounded-lg p-2"
                       >
                         <option value="pendiente">pendiente</option>
@@ -249,8 +267,10 @@ export default function Admin() {
 
                     <td className="p-2">
                       <select
-                        value={order.status}
-                        onChange={(e) => updateOrder(order, { status: e.target.value })}
+                        value={order.status || "esperando_pago"}
+                        onChange={(e) =>
+                          updateOrder(order, { status: e.target.value })
+                        }
                         className="border rounded-lg p-2"
                       >
                         <option value="esperando_pago">esperando_pago</option>
@@ -268,8 +288,9 @@ export default function Admin() {
                           className="text-orange-500 font-bold underline"
                           href={order.mp_init_point}
                           target="_blank"
+                          rel="noreferrer"
                         >
-                          Link pago
+                          Pago
                         </a>
                       )}
                     </td>
@@ -291,6 +312,7 @@ export default function Admin() {
                 <tr className="text-left border-b">
                   <th className="p-2">Producto</th>
                   <th className="p-2">Categoría</th>
+                  <th className="p-2">Imagen</th>
                   <th className="p-2">Precio</th>
                   <th className="p-2">Stock</th>
                   <th className="p-2">Activo</th>
@@ -300,15 +322,37 @@ export default function Admin() {
               <tbody>
                 {products.map((product) => (
                   <tr key={product.id} className="border-b">
-                    <td className="p-2 font-bold">{product.name}</td>
+                    <td className="p-2 font-bold">
+                      <input
+                        defaultValue={product.name}
+                        className="border rounded-lg p-2 w-64"
+                        onBlur={(e) =>
+                          updateProduct(product, { name: e.target.value })
+                        }
+                      />
+                    </td>
+
                     <td className="p-2">{product.category}</td>
+
+                    <td className="p-2">
+                      <input
+                        defaultValue={product.image_url || ""}
+                        placeholder="ej: tunica-normal.jpg"
+                        className="border rounded-lg p-2 w-48"
+                        onBlur={(e) =>
+                          updateProduct(product, { image_url: e.target.value })
+                        }
+                      />
+                    </td>
 
                     <td className="p-2">
                       <input
                         type="number"
                         defaultValue={product.price}
                         className="border rounded-lg p-2 w-24"
-                        onBlur={(e) => updateProduct(product, { price: Number(e.target.value) })}
+                        onBlur={(e) =>
+                          updateProduct(product, { price: Number(e.target.value) })
+                        }
                       />
                     </td>
 
@@ -320,7 +364,9 @@ export default function Admin() {
                           type="number"
                           defaultValue={product.stock || 0}
                           className="border rounded-lg p-2 w-24"
-                          onBlur={(e) => updateProduct(product, { stock: Number(e.target.value) })}
+                          onBlur={(e) =>
+                            updateProduct(product, { stock: Number(e.target.value) })
+                          }
                         />
                       )}
                     </td>
@@ -329,7 +375,9 @@ export default function Admin() {
                       <input
                         type="checkbox"
                         checked={product.active}
-                        onChange={(e) => updateProduct(product, { active: e.target.checked })}
+                        onChange={(e) =>
+                          updateProduct(product, { active: e.target.checked })
+                        }
                       />
                     </td>
                   </tr>
@@ -359,7 +407,10 @@ export default function Admin() {
               className="border rounded-xl p-3 w-32"
             />
 
-            <button onClick={createSlot} className="bg-orange-500 text-white px-5 py-3 rounded-xl font-bold">
+            <button
+              onClick={createSlot}
+              className="bg-orange-500 text-white px-5 py-3 rounded-xl font-bold"
+            >
               Agregar fecha
             </button>
           </div>
@@ -386,7 +437,9 @@ export default function Admin() {
                         type="number"
                         defaultValue={slot.capacity}
                         className="border rounded-lg p-2 w-24"
-                        onBlur={(e) => updateSlot(slot, { capacity: Number(e.target.value) })}
+                        onBlur={(e) =>
+                          updateSlot(slot, { capacity: Number(e.target.value) })
+                        }
                       />
                     </td>
 
@@ -397,7 +450,9 @@ export default function Admin() {
                       <input
                         type="checkbox"
                         checked={slot.active}
-                        onChange={(e) => updateSlot(slot, { active: e.target.checked })}
+                        onChange={(e) =>
+                          updateSlot(slot, { active: e.target.checked })
+                        }
                       />
                     </td>
                   </tr>

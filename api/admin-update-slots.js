@@ -1,33 +1,53 @@
-import { requireEmployee, supabaseAdmin } from "./adminAuth.js";
+import { requireEmployee, supabaseAdmin, getBody } from "./adminAuth.js";
 
 export default async function handler(req, res) {
   try {
-    const { employee } = await requireEmployee(req);
-
-    if (!["admin", "employee"].includes(employee.role)) {
-      return res.status(403).json({ error: "Sin permiso" });
+    if (req.method !== "POST") {
+      return res.status(405).json({
+        error: "Método no permitido"
+      });
     }
 
-    const { id, pickup_date, capacity, active } = req.body;
+    await requireEmployee(req);
+
+    const body = getBody(req);
+
+    const {
+      id,
+      pickup_date,
+      capacity,
+      active
+    } = body;
 
     if (id) {
       const patch = {};
 
-      if (capacity !== undefined) patch.capacity = Number(capacity);
-      if (active !== undefined) patch.active = Boolean(active);
+      if (capacity !== undefined) {
+        patch.capacity = Number(capacity);
+      }
+
+      if (active !== undefined) {
+        patch.active = Boolean(active);
+      }
 
       const { error } = await supabaseAdmin
         .from("pickup_slots")
         .update(patch)
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({
+        ok: true
+      });
     }
 
     if (!pickup_date) {
-      return res.status(400).json({ error: "Falta fecha" });
+      return res.status(400).json({
+        error: "Falta fecha"
+      });
     }
 
     const { error } = await supabaseAdmin
@@ -39,11 +59,19 @@ export default async function handler(req, res) {
         active: active !== false
       });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({
+      ok: true
+    });
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.error("ERROR admin-update-slot:", error);
+
+    return res.status(500).json({
+      error: error.message || "Error actualizando cupo"
+    });
   }
 }

@@ -6,8 +6,14 @@ export const supabaseAdmin = createClient(
 );
 
 export function getBody(req) {
-  if (!req.body) return {};
-  if (typeof req.body === "string") return JSON.parse(req.body);
+  if (!req.body) {
+    return {};
+  }
+
+  if (typeof req.body === "string") {
+    return JSON.parse(req.body);
+  }
+
   return req.body;
 }
 
