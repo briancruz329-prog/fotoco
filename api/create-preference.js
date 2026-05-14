@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { appendPedidoToSheet } from "./googleSheets.js";
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -286,7 +287,25 @@ export default async function handler(req, res) {
           payment_status: "error_creando_pago"
         })
         .eq("id", order.id);
-
+        
+        try {
+  await appendPedidoToSheet({
+    orderId: order.id,
+    customerName,
+    customerPhone,
+    customerEmail,
+    productos: orderItems.map((item) => item.product_name).join(", "),
+    total,
+    pickupDate: hasCuaderneta ? pickupDate : "",
+    status: "esperando_pago",
+    paymentStatus: "pendiente",
+    paymentUrl: mpData.init_point,
+    preferenceId: mpData.id,
+    paymentId: ""
+  });
+} catch (sheetError) {
+  console.error("Error escribiendo en Google Sheets:", sheetError);
+}
       return res.status(500).json({
         error: "No se pudo crear el pago en Mercado Pago",
         detail: mpData
