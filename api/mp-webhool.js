@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { appendPedidoToSheet } from "./googleSheets.js";
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -56,6 +57,35 @@ export default async function handler(req, res) {
       })
       .eq("id", orderId);
 
+      try {
+  const { data: orderData } = await supabaseAdmin
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .single();
+
+  const { data: itemsData } = await supabaseAdmin
+    .from("order_items")
+    .select("*")
+    .eq("order_id", orderId);
+
+  await appendPedidoToSheet({
+    orderId,
+    customerName: orderData?.customer_name || "",
+    customerPhone: orderData?.customer_phone || "",
+    customerEmail: orderData?.customer_email || "",
+    productos: (itemsData || []).map((item) => item.product_name).join(", "),
+    total: orderData?.total || 0,
+    pickupDate: orderData?.pickup_date || "",
+    status: orderStatus,
+    paymentStatus,
+    paymentUrl: orderData?.mp_init_point || "",
+    preferenceId: orderData?.mp_preference_id || "",
+    paymentId: String(paymentId)
+  });
+} catch (sheetError) {
+  console.error("Error escribiendo actualización en Google Sheets:", sheetError);
+}
     return res.status(200).json({ ok: true });
 
   } catch (error) {

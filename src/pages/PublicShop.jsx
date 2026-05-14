@@ -94,73 +94,85 @@ const filteredProducts = products.filter((product) => {
   const hasCuaderneta = cart.some((product) => product.category === "cuaderneta");
 
   async function checkout() {
-    if (cart.length === 0) {
-      alert("El carrito está vacío");
-      return;
-    }
+  if (cart.length === 0) {
+    alert("El carrito está vacío");
+    return;
+  }
 
-    if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
-      alert("Completá nombre, celular y mail");
-      return;
-    }
+  if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
+    alert("Completá nombre, celular y mail");
+    return;
+  }
 
-    if (hasCuaderneta && !pickupDate) {
-      alert("Seleccioná una fecha para retirar la cuaderneta");
-      return;
-    }
+  if (hasCuaderneta && !pickupDate) {
+    alert("Seleccioná una fecha para retirar la cuaderneta");
+    return;
+  }
 
-    if (hasTunica && (!talle || !entallada)) {
-      alert("Completá talle y si la túnica es entallada");
-      return;
-    }
+  if (hasTunica && (!talle || !entallada)) {
+    alert("Completá talle y si la túnica es entallada");
+    return;
+  }
 
-    const items = cart.map((product) => {
-      return {
-        name: product.name,
-        talle: product.category === "tunica" ? talle : "",
-        entallada: product.category === "tunica" ? entallada : ""
-      };
+  const items = cart.map((product) => {
+    return {
+      name: product.name,
+      talle: product.category === "tunica" ? talle : "",
+      entallada: product.category === "tunica" ? entallada : ""
+    };
+  });
+
+  setLoading(true);
+
+  try {
+    const response = await fetch("/api/create-preference", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        customerName,
+        customerPhone,
+        customerEmail,
+        items,
+        pickupDate
+      })
     });
 
-    setLoading(true);
+    const text = await response.text();
+
+    let data;
 
     try {
-      const response = await fetch("/api/create-preference", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          customerEmail,
-          items,
-          pickupDate
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.error || "Error al crear el pedido");
-        setLoading(false);
-        return;
-      }
-
-      if (!data.paymentUrl) {
-        alert("No se pudo generar el link de pago");
-        setLoading(false);
-        return;
-      }
-
-      window.location.href = data.paymentUrl;
-
+      data = JSON.parse(text);
     } catch (error) {
-      console.error(error);
-      alert("Error al conectar con el servidor");
+      console.error("Respuesta NO JSON del servidor:", text);
+      alert("El servidor falló antes de devolver JSON. Revisá los logs de Vercel.");
       setLoading(false);
+      return;
     }
+
+    if (!response.ok) {
+      console.error("Error del servidor:", data);
+      alert(data.error || "Error al crear el pedido");
+      setLoading(false);
+      return;
+    }
+
+    if (!data.paymentUrl) {
+      alert("No se pudo generar el link de pago");
+      setLoading(false);
+      return;
+    }
+
+    window.location.href = data.paymentUrl;
+
+  } catch (error) {
+    console.error("Error conectando con el servidor:", error);
+    alert("Error al conectar con el servidor");
+    setLoading(false);
   }
+}
 
   return (
     <div className="min-h-screen bg-orange-50 text-zinc-900">
