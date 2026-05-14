@@ -387,12 +387,14 @@ const filteredProducts = products.filter((product) => {
                     className="w-full border rounded-xl px-4 py-3 mb-3"
                   >
                     <option value="">Seleccionar talle</option>
-                    <option>XS</option>
-                    <option>S</option>
-                    <option>M</option>
-                    <option>L</option>
-                    <option>XL</option>
-                    <option>XXL</option>
+                    <option>42</option>
+                    <option>44</option>
+                    <option>46</option>
+                    <option>48</option>
+                    <option>50</option>
+                    <option>52</option>
+                    <option>54</option>
+                    <option>56</option>
                   </select>
 
                   <select
