@@ -22,27 +22,38 @@ export default function PublicShop() {
   }, []);
 
 async function loadData() {
-  const { data: productsData, error: productsError } = await supabase
-  .from("products")
-  .select("*")
-  .eq("active", true)
-  .order("category", { ascending: true })
-  .order("name", { ascending: true });
+  console.log("URL SUPABASE PRODUCCIÓN:", import.meta.env.VITE_SUPABASE_URL);
+  console.log(
+    "KEY SUPABASE CARGADA:",
+    Boolean(
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+    )
+  );
 
-console.log("PRODUCTOS RECIBIDOS:", productsData);
-console.log("ERROR PRODUCTOS:", productsError);
+  const { data: productsData, error: productsError } = await supabase
+    .from("products")
+    .select("id, name, category, price, active, stock, image_url")
+    .limit(1000);
+
+  console.log("PRODUCTOS SIN FILTRO:", productsData);
+  console.log("ERROR PRODUCTOS SIN FILTRO:", productsError);
 
   if (productsError) {
-    alert("Error cargando productos");
+    alert("Error cargando productos: " + productsError.message);
     return;
   }
 
   const { data: slotsData, error: slotsError } = await supabase
     .from("pickup_slots")
-    .select("*");
+    .select("*")
+    .limit(1000);
+
+  console.log("CUPOS SIN FILTRO:", slotsData);
+  console.log("ERROR CUPOS SIN FILTRO:", slotsError);
 
   if (slotsError) {
-    alert("Error cargando cupos");
+    alert("Error cargando cupos: " + slotsError.message);
     return;
   }
 
