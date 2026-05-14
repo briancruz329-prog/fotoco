@@ -23,7 +23,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-orange-50 flex items-center justify-center p-6">
-      <form onSubmit={login} className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full">
+      <form
+        onSubmit={login}
+        className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full"
+      >
         <h1 className="text-3xl font-black text-orange-500 mb-2">
           Panel empleados
         </h1>

@@ -24,13 +24,8 @@ export default async function handler(req, res) {
   try {
     const body = leerBody(req);
 
-    const {
-      customerName,
-      customerPhone,
-      customerEmail,
-      items,
-      pickupDate
-    } = body;
+    const { customerName, customerPhone, customerEmail, items, pickupDate } =
+      body;
 
     if (!customerName || !customerPhone || !customerEmail) {
       return res.status(400).json({
@@ -53,10 +48,7 @@ export default async function handler(req, res) {
       .eq("active", true);
 
     if (productsError) {
-      console.error(productsError);
-      return res.status(500).json({
-        error: "Error consultando productos"
-      });
+      throw productsError;
     }
 
     if (!products || products.length === 0) {
@@ -168,7 +160,7 @@ export default async function handler(req, res) {
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
-        total: total,
+        total,
         pickup_date: hasCuaderneta ? pickupDate : null,
         status: "esperando_pago",
         payment_status: "pendiente"
@@ -177,10 +169,7 @@ export default async function handler(req, res) {
       .single();
 
     if (orderError) {
-      console.error(orderError);
-      return res.status(500).json({
-        error: "Error creando pedido"
-      });
+      throw orderError;
     }
 
     const itemsWithOrderId = orderItems.map((item) => {
@@ -195,10 +184,7 @@ export default async function handler(req, res) {
       .insert(itemsWithOrderId);
 
     if (itemError) {
-      console.error(itemError);
-      return res.status(500).json({
-        error: "Error guardando productos del pedido"
-      });
+      throw itemError;
     }
 
     for (const [productName, quantity] of Object.entries(counts)) {
@@ -215,10 +201,7 @@ export default async function handler(req, res) {
           .eq("id", product.id);
 
         if (stockError) {
-          console.error(stockError);
-          return res.status(500).json({
-            error: "Error actualizando stock"
-          });
+          throw stockError;
         }
       }
     }
@@ -232,10 +215,7 @@ export default async function handler(req, res) {
         .eq("id", slot.id);
 
       if (slotUpdateError) {
-        console.error(slotUpdateError);
-        return res.status(500).json({
-          error: "Error actualizando cupo de cuaderneta"
-        });
+        throw slotUpdateError;
       }
     }
 
@@ -278,8 +258,6 @@ export default async function handler(req, res) {
     const mpData = await mpResponse.json();
 
     if (!mpResponse.ok || !mpData.init_point) {
-      console.error(mpData);
-
       await supabaseAdmin
         .from("orders")
         .update({
@@ -287,25 +265,7 @@ export default async function handler(req, res) {
           payment_status: "error_creando_pago"
         })
         .eq("id", order.id);
-        
-        try {
-  await appendPedidoToSheet({
-    orderId: order.id,
-    customerName,
-    customerPhone,
-    customerEmail,
-    productos: orderItems.map((item) => item.product_name).join(", "),
-    total,
-    pickupDate: hasCuaderneta ? pickupDate : "",
-    status: "esperando_pago",
-    paymentStatus: "pendiente",
-    paymentUrl: mpData.init_point,
-    preferenceId: mpData.id,
-    paymentId: ""
-  });
-} catch (sheetError) {
-  console.error("Error escribiendo en Google Sheets:", sheetError);
-}
+
       return res.status(500).json({
         error: "No se pudo crear el pago en Mercado Pago",
         detail: mpData
@@ -320,12 +280,30 @@ export default async function handler(req, res) {
       })
       .eq("id", order.id);
 
+    try {
+      await appendPedidoToSheet({
+        orderId: order.id,
+        customerName,
+        customerPhone,
+        customerEmail,
+        productos: orderItems.map((item) => item.product_name).join(", "),
+        total,
+        pickupDate: hasCuaderneta ? pickupDate : "",
+        status: "esperando_pago",
+        paymentStatus: "pendiente",
+        paymentUrl: mpData.init_point,
+        preferenceId: mpData.id,
+        paymentId: ""
+      });
+    } catch (sheetError) {
+      console.error("Error escribiendo en Google Sheets:", sheetError);
+    }
+
     return res.status(200).json({
       ok: true,
       orderId: order.id,
       paymentUrl: mpData.init_point
     });
-
   } catch (error) {
     console.error(error);
 

@@ -12,12 +12,7 @@ export default async function handler(req, res) {
 
     const body = getBody(req);
 
-    const {
-      id,
-      pickup_date,
-      capacity,
-      active
-    } = body;
+    const { id, pickup_date, capacity, active } = body;
 
     if (id) {
       const patch = {};
@@ -50,14 +45,17 @@ export default async function handler(req, res) {
       });
     }
 
-    const { error } = await supabaseAdmin
-      .from("pickup_slots")
-      .insert({
+    const { error } = await supabaseAdmin.from("pickup_slots").upsert(
+      {
         pickup_date,
         capacity: Number(capacity || 25),
         reserved: 0,
         active: active !== false
-      });
+      },
+      {
+        onConflict: "pickup_date"
+      }
+    );
 
     if (error) {
       throw error;
@@ -66,12 +64,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true
     });
-
   } catch (error) {
-    console.error("ERROR admin-update-slot:", error);
-
     return res.status(500).json({
-      error: error.message || "Error actualizando cupo"
+      error: error.message
     });
   }
 }

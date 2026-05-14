@@ -21,50 +21,40 @@ export default function PublicShop() {
     loadData();
   }, []);
 
-async function loadData() {
-  console.log("URL SUPABASE PRODUCCIÓN:", import.meta.env.VITE_SUPABASE_URL);
-  console.log(
-    "KEY SUPABASE CARGADA:",
-    Boolean(
-      import.meta.env.VITE_SUPABASE_ANON_KEY ||
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-    )
-  );
+  async function loadData() {
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
 
-  const { data: productsData, error: productsError } = await supabase
-    .from("products")
-    .select("id, name, category, price, active, stock, image_url")
-    .limit(1000);
+    if (productsError) {
+      console.error(productsError);
+      alert("Error cargando productos");
+      return;
+    }
 
-  console.log("PRODUCTOS SIN FILTRO:", productsData);
-  console.log("ERROR PRODUCTOS SIN FILTRO:", productsError);
+    const { data: slotsData, error: slotsError } = await supabase
+      .from("pickup_slots")
+      .select("*")
+      .eq("active", true)
+      .order("pickup_date", { ascending: true });
 
-  if (productsError) {
-    alert("Error cargando productos: " + productsError.message);
-    return;
+    if (slotsError) {
+      console.error(slotsError);
+      alert("Error cargando cupos");
+      return;
+    }
+
+    setProducts(productsData || []);
+
+    const availableSlots = (slotsData || []).filter((slot) => {
+      return Number(slot.capacity) - Number(slot.reserved) > 0;
+    });
+
+    setSlots(availableSlots);
   }
-
-  const { data: slotsData, error: slotsError } = await supabase
-    .from("pickup_slots")
-    .select("*")
-    .limit(1000);
-
-  console.log("CUPOS SIN FILTRO:", slotsData);
-  console.log("ERROR CUPOS SIN FILTRO:", slotsError);
-
-  if (slotsError) {
-    alert("Error cargando cupos: " + slotsError.message);
-    return;
-  }
-
-  setProducts(productsData || []);
-
-  const availableSlots = (slotsData || []).filter((slot) => {
-    return Number(slot.capacity) - Number(slot.reserved) > 0;
-  });
-
-  setSlots(availableSlots);
-}
 
   function productStockRemaining(product) {
     if (product.category === "cuaderneta") {
@@ -96,10 +86,14 @@ async function loadData() {
     setCart([]);
   }
 
-const filteredProducts = products.filter((product) => {
-  const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-  return matchesSearch;
-});
+  const filteredProducts = products.filter((product) => {
+    const sameCategory = product.category === category;
+    const matchesSearch = product.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    return sameCategory && matchesSearch;
+  });
 
   const total = cart.reduce((sum, product) => {
     return sum + Number(product.price);
@@ -109,90 +103,93 @@ const filteredProducts = products.filter((product) => {
   const hasCuaderneta = cart.some((product) => product.category === "cuaderneta");
 
   async function checkout() {
-  if (cart.length === 0) {
-    alert("El carrito está vacío");
-    return;
-  }
+    if (cart.length === 0) {
+      alert("El carrito está vacío");
+      return;
+    }
 
-  if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
-    alert("Completá nombre, celular y mail");
-    return;
-  }
+    if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
+      alert("Completá nombre, celular y mail");
+      return;
+    }
 
-  if (hasCuaderneta && !pickupDate) {
-    alert("Seleccioná una fecha para retirar la cuaderneta");
-    return;
-  }
+    if (hasCuaderneta && !pickupDate) {
+      alert("Seleccioná una fecha para retirar la cuaderneta");
+      return;
+    }
 
-  if (hasTunica && (!talle || !entallada)) {
-    alert("Completá talle y si la túnica es entallada");
-    return;
-  }
+    if (hasTunica && (!talle || !entallada)) {
+      alert("Completá talle y si la túnica es entallada");
+      return;
+    }
 
-  const items = cart.map((product) => {
-    return {
-      name: product.name,
-      talle: product.category === "tunica" ? talle : "",
-      entallada: product.category === "tunica" ? entallada : ""
-    };
-  });
-
-  setLoading(true);
-
-  try {
-    const response = await fetch("/api/create-preference", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        customerName,
-        customerPhone,
-        customerEmail,
-        items,
-        pickupDate
-      })
+    const items = cart.map((product) => {
+      return {
+        name: product.name,
+        talle: product.category === "tunica" ? talle : "",
+        entallada: product.category === "tunica" ? entallada : ""
+      };
     });
 
-    const text = await response.text();
-
-    let data;
+    setLoading(true);
 
     try {
-      data = JSON.parse(text);
+      const response = await fetch("/api/create-preference", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customerName,
+          customerPhone,
+          customerEmail,
+          items,
+          pickupDate
+        })
+      });
+
+      const text = await response.text();
+
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        console.error("Respuesta no JSON del servidor:", text);
+        alert("El servidor falló antes de devolver JSON.");
+        setLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        console.error("Error del servidor:", data);
+        alert(data.error || "Error al crear el pedido");
+        setLoading(false);
+        return;
+      }
+
+      if (!data.paymentUrl) {
+        alert("No se pudo generar el link de pago");
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = data.paymentUrl;
     } catch (error) {
-      console.error("Respuesta NO JSON del servidor:", text);
-      alert("El servidor falló antes de devolver JSON. Revisá los logs de Vercel.");
+      console.error(error);
+      alert("Error al conectar con el servidor");
       setLoading(false);
-      return;
     }
-
-    if (!response.ok) {
-      console.error("Error del servidor:", data);
-      alert(data.error || "Error al crear el pedido");
-      setLoading(false);
-      return;
-    }
-
-    if (!data.paymentUrl) {
-      alert("No se pudo generar el link de pago");
-      setLoading(false);
-      return;
-    }
-
-    window.location.href = data.paymentUrl;
-
-  } catch (error) {
-    console.error("Error conectando con el servidor:", error);
-    alert("Error al conectar con el servidor");
-    setLoading(false);
   }
-}
 
   return (
     <div className="min-h-screen bg-orange-50 text-zinc-900">
       <button
-        onClick={() => document.getElementById("carrito-panel")?.scrollIntoView({ behavior: "smooth" })}
+        onClick={() =>
+          document
+            .getElementById("carrito-panel")
+            ?.scrollIntoView({ behavior: "smooth" })
+        }
         className="fixed bottom-6 right-6 bg-orange-500 hover:bg-orange-600 text-white px-5 py-4 rounded-full shadow-xl z-40 flex items-center gap-2 font-bold"
       >
         🛒 <span>{cart.length}</span>
@@ -207,7 +204,7 @@ const filteredProducts = products.filter((product) => {
 
       <div className="max-w-7xl mx-auto p-6">
         <header id="top" className="text-center py-10">
-          <img src="/logo-aeq.jpg" alt="AEQ" className="h-24 mx-auto mb-5" />
+          <img src="/logo-aeq.png" alt="AEQ" className="h-24 mx-auto mb-5" />
 
           <h1 className="text-5xl md:text-7xl font-black text-orange-500 tracking-tight">
             FOTOCOPIADORA AEQ
@@ -276,7 +273,8 @@ const filteredProducts = products.filter((product) => {
 
               {filteredProducts.map((product) => {
                 const remaining = productStockRemaining(product);
-                const sinStock = product.category !== "cuaderneta" && remaining <= 0;
+                const sinStock =
+                  product.category !== "cuaderneta" && remaining <= 0;
 
                 return (
                   <div
@@ -295,10 +293,29 @@ const filteredProducts = products.filter((product) => {
                     )}
 
                     <div className="flex-1">
-                      <p className="font-bold text-lg">{product.name}</p>
-                      <p className="text-orange-500 font-black">${product.price}</p>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-bold text-lg">{product.name}</p>
 
-                      <p className={sinStock ? "text-sm text-red-500 font-bold" : "text-sm text-zinc-500"}>
+                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-100 text-orange-600">
+                          {product.category === "cuaderneta"
+                            ? "Cuaderneta"
+                            : product.category === "tunica"
+                              ? "Túnica"
+                              : "Regla"}
+                        </span>
+                      </div>
+
+                      <p className="text-orange-500 font-black">
+                        ${product.price}
+                      </p>
+
+                      <p
+                        className={
+                          sinStock
+                            ? "text-sm text-red-500 font-bold"
+                            : "text-sm text-zinc-500"
+                        }
+                      >
                         {product.category === "cuaderneta"
                           ? "Cupo diario compartido"
                           : sinStock
@@ -333,16 +350,16 @@ const filteredProducts = products.filter((product) => {
             </h2>
 
             <div className="space-y-2 mb-4">
-              {cart.length === 0 && (
-                <p className="text-zinc-500">Vacío</p>
-              )}
+              {cart.length === 0 && <p className="text-zinc-500">Vacío</p>}
 
               {cart.map((item, index) => (
                 <div
                   key={index}
                   className="flex justify-between gap-2 border-b border-zinc-200 py-2"
                 >
-                  <span>{item.name} - ${item.price}</span>
+                  <span>
+                    {item.name} - ${item.price}
+                  </span>
 
                   <button
                     onClick={() => removeFromCart(index)}
@@ -439,7 +456,8 @@ const filteredProducts = products.filter((product) => {
 
                     {slots.map((slot) => (
                       <option key={slot.id} value={slot.pickup_date}>
-                        {slot.pickup_date} — {slot.capacity - slot.reserved} cupos
+                        {slot.pickup_date} —{" "}
+                        {Number(slot.capacity) - Number(slot.reserved)} cupos
                       </option>
                     ))}
                   </select>

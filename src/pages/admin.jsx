@@ -31,37 +31,34 @@ export default function Admin() {
   }
 
   async function apiFetch(url, options = {}) {
-  const token = session?.access_token;
+    const token = session?.access_token;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {})
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {})
+      }
+    });
+
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      console.error("Respuesta no JSON:", text);
+      throw new Error("La API no respondió JSON. Revisá si la ruta existe.");
     }
-  });
 
-  const text = await response.text();
+    if (!response.ok) {
+      throw new Error(data.error || "Error en servidor");
+    }
 
-  let data;
-
-  try {
-    data = JSON.parse(text);
-  } catch (error) {
-    console.error("Respuesta no JSON:", text);
-
-    throw new Error(
-      "La API no respondió JSON. Probablemente la ruta no existe o Vercel devolvió 404."
-    );
+    return data;
   }
-
-  if (!response.ok) {
-    throw new Error(data.error || "Error en servidor");
-  }
-
-  return data;
-}
 
   async function loadAdminData(token = session?.access_token) {
     const response = await fetch("/api/admin-data", {
@@ -186,7 +183,7 @@ export default function Admin() {
               Panel empleados AEQ
             </h1>
             <p className="text-zinc-600">
-              Desde acá se editan pedidos, productos, stock y cupos directamente en Supabase.
+              Editar pedidos, productos, stock y cupos.
             </p>
           </div>
 
@@ -234,7 +231,9 @@ export default function Admin() {
                     <td className="p-2">
                       <b>{order.customer_name}</b>
                       <br />
-                      <span className="text-zinc-500">{order.customer_email}</span>
+                      <span className="text-zinc-500">
+                        {order.customer_email}
+                      </span>
                     </td>
 
                     <td className="p-2">{order.customer_phone}</td>
@@ -276,7 +275,9 @@ export default function Admin() {
                         <option value="esperando_pago">esperando_pago</option>
                         <option value="pagado">pagado</option>
                         <option value="preparando">preparando</option>
-                        <option value="listo_para_retirar">listo_para_retirar</option>
+                        <option value="listo_para_retirar">
+                          listo_para_retirar
+                        </option>
                         <option value="entregado">entregado</option>
                         <option value="cancelado">cancelado</option>
                       </select>
@@ -351,7 +352,9 @@ export default function Admin() {
                         defaultValue={product.price}
                         className="border rounded-lg p-2 w-24"
                         onBlur={(e) =>
-                          updateProduct(product, { price: Number(e.target.value) })
+                          updateProduct(product, {
+                            price: Number(e.target.value)
+                          })
                         }
                       />
                     </td>
@@ -365,7 +368,9 @@ export default function Admin() {
                           defaultValue={product.stock || 0}
                           className="border rounded-lg p-2 w-24"
                           onBlur={(e) =>
-                            updateProduct(product, { stock: Number(e.target.value) })
+                            updateProduct(product, {
+                              stock: Number(e.target.value)
+                            })
                           }
                         />
                       )}
@@ -438,13 +443,17 @@ export default function Admin() {
                         defaultValue={slot.capacity}
                         className="border rounded-lg p-2 w-24"
                         onBlur={(e) =>
-                          updateSlot(slot, { capacity: Number(e.target.value) })
+                          updateSlot(slot, {
+                            capacity: Number(e.target.value)
+                          })
                         }
                       />
                     </td>
 
                     <td className="p-2">{slot.reserved}</td>
-                    <td className="p-2">{slot.capacity - slot.reserved}</td>
+                    <td className="p-2">
+                      {Number(slot.capacity) - Number(slot.reserved)}
+                    </td>
 
                     <td className="p-2">
                       <input

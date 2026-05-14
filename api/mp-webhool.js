@@ -9,12 +9,12 @@ const supabaseAdmin = createClient(
 export default async function handler(req, res) {
   try {
     const paymentId =
-      req.query["data.id"] ||
-      req.query.id ||
-      req.body?.data?.id;
+      req.query["data.id"] || req.query.id || req.body?.data?.id;
 
     if (!paymentId) {
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({
+        ok: true
+      });
     }
 
     const response = await fetch(
@@ -31,7 +31,9 @@ export default async function handler(req, res) {
     const orderId = payment.external_reference;
 
     if (!orderId) {
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({
+        ok: true
+      });
     }
 
     let paymentStatus = "pendiente";
@@ -57,38 +59,46 @@ export default async function handler(req, res) {
       })
       .eq("id", orderId);
 
-      try {
-  const { data: orderData } = await supabaseAdmin
-    .from("orders")
-    .select("*")
-    .eq("id", orderId)
-    .single();
+    try {
+      const { data: orderData } = await supabaseAdmin
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
 
-  const { data: itemsData } = await supabaseAdmin
-    .from("order_items")
-    .select("*")
-    .eq("order_id", orderId);
+      const { data: itemsData } = await supabaseAdmin
+        .from("order_items")
+        .select("*")
+        .eq("order_id", orderId);
 
-  await appendPedidoToSheet({
-    orderId,
-    customerName: orderData?.customer_name || "",
-    customerPhone: orderData?.customer_phone || "",
-    customerEmail: orderData?.customer_email || "",
-    productos: (itemsData || []).map((item) => item.product_name).join(", "),
-    total: orderData?.total || 0,
-    pickupDate: orderData?.pickup_date || "",
-    status: orderStatus,
-    paymentStatus,
-    paymentUrl: orderData?.mp_init_point || "",
-    preferenceId: orderData?.mp_preference_id || "",
-    paymentId: String(paymentId)
-  });
-} catch (sheetError) {
-  console.error("Error escribiendo actualización en Google Sheets:", sheetError);
-}
-    return res.status(200).json({ ok: true });
+      await appendPedidoToSheet({
+        orderId,
+        customerName: orderData?.customer_name || "",
+        customerPhone: orderData?.customer_phone || "",
+        customerEmail: orderData?.customer_email || "",
+        productos: (itemsData || [])
+          .map((item) => item.product_name)
+          .join(", "),
+        total: orderData?.total || 0,
+        pickupDate: orderData?.pickup_date || "",
+        status: orderStatus,
+        paymentStatus,
+        paymentUrl: orderData?.mp_init_point || "",
+        preferenceId: orderData?.mp_preference_id || "",
+        paymentId: String(paymentId)
+      });
+    } catch (sheetError) {
+      console.error("Error escribiendo actualización en Google Sheets:", sheetError);
+    }
 
+    return res.status(200).json({
+      ok: true
+    });
   } catch (error) {
-    return res.status(200).json({ ok: false });
+    console.error(error);
+
+    return res.status(200).json({
+      ok: false
+    });
   }
 }

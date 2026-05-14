@@ -17,7 +17,6 @@ async function devolverStockDeItems(items) {
       .single();
 
     if (productError || !product) {
-      console.error("No se pudo leer producto para devolver stock:", item);
       continue;
     }
 
@@ -49,7 +48,6 @@ async function liberarCupoCuaderneta(order) {
     .single();
 
   if (slotError || !slot) {
-    console.error("No se encontró cupo para liberar:", order.pickup_date);
     return;
   }
 
@@ -134,11 +132,7 @@ export default async function handler(req, res) {
 
     const body = getBody(req);
 
-    const {
-      id,
-      status,
-      payment_status
-    } = body;
+    const { id, status, payment_status } = body;
 
     if (!id) {
       return res.status(400).json({
@@ -148,7 +142,6 @@ export default async function handler(req, res) {
 
     if (payment_status === "rechazado" || status === "cancelado") {
       const result = await eliminarPedidoCompleto(id);
-
       return res.status(200).json(result);
     }
 
@@ -175,12 +168,9 @@ export default async function handler(req, res) {
       ok: true,
       deleted: false
     });
-
   } catch (error) {
-    console.error("ERROR admin-update-order:", error);
-
     return res.status(500).json({
-      error: error.message || "Error actualizando pedido"
+      error: error.message
     });
   }
 }
