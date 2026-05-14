@@ -29,6 +29,9 @@ async function loadData() {
   .order("category", { ascending: true })
   .order("name", { ascending: true });
 
+console.log("PRODUCTOS RECIBIDOS:", productsData);
+console.log("ERROR PRODUCTOS:", productsError);
+
   if (productsError) {
     alert("Error cargando productos");
     return;
