@@ -21,40 +21,55 @@ export default function PublicShop() {
     loadData();
   }, []);
 
-  async function loadData() {
-    const { data: productsData, error: productsError } = await supabase
-      .from("products")
-      .select("*")
-      .eq("active", true)
-      .order("category", { ascending: true })
-      .order("name", { ascending: true });
+async function loadData() {
+  console.log("Cargando datos...");
+  console.log("URL:", import.meta.env.VITE_SUPABASE_URL);
+  console.log("KEY cargada:", !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
-    if (productsError) {
-      console.error(productsError);
-      alert("Error cargando productos");
-      return;
-    }
+  const { data: productsData, error: productsError } = await supabase
+    .from("products")
+    .select("*");
 
-    const { data: slotsData, error: slotsError } = await supabase
-      .from("pickup_slots")
-      .select("*")
-      .eq("active", true)
-      .order("pickup_date", { ascending: true });
+  console.log("PRODUCTOS DATA:", productsData);
+  console.log("PRODUCTOS ERROR:", productsError);
 
-    if (slotsError) {
-      console.error(slotsError);
-      alert("Error cargando cupos");
-      return;
-    }
-
-    setProducts(productsData || []);
-
-    const availableSlots = (slotsData || []).filter((slot) => {
-      return Number(slot.capacity) - Number(slot.reserved) > 0;
-    });
-
-    setSlots(availableSlots);
+  if (productsError) {
+    alert(
+      "Error cargando productos: " +
+      productsError.message +
+      " | Code: " +
+      productsError.code
+    );
+    return;
   }
+
+  const { data: slotsData, error: slotsError } = await supabase
+    .from("pickup_slots")
+    .select("*");
+
+  console.log("CUPOS DATA:", slotsData);
+  console.log("CUPOS ERROR:", slotsError);
+
+  if (slotsError) {
+    alert(
+      "Error cargando cupos: " +
+      slotsError.message +
+      " | Code: " +
+      slotsError.code
+    );
+    return;
+  }
+
+  alert("Productos recibidos: " + (productsData ? productsData.length : 0));
+
+  setProducts(productsData || []);
+
+  const availableSlots = (slotsData || []).filter((slot) => {
+    return Number(slot.capacity) - Number(slot.reserved) > 0;
+  });
+
+  setSlots(availableSlots);
+}
 
   function productStockRemaining(product) {
     if (product.category === "cuaderneta") {
@@ -87,8 +102,10 @@ export default function PublicShop() {
   }
 
 const filteredProducts = products.filter((product) => {
+  const sameCategory = product.category === category;
   const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-  return matchesSearch;
+
+  return sameCategory && matchesSearch;
 });
 
   const total = cart.reduce((sum, product) => {
