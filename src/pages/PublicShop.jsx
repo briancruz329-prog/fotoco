@@ -1,6 +1,64 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+const CUADERNETA_GROUPS = [
+  {
+    title: "Primer semestre",
+    items: [
+      { match: "Química General 1", label: "Química General 1" },
+      { match: "ICB1", label: "ICB 1" },
+      { match: "Matemática 01", label: "Matemática 01" },
+      { match: "Matemática A", label: "Matemática A" },
+      { match: "Matemática 03", label: "Matemática 03" },
+      { match: "Manual de Datos", label: "Manual de datos" },
+      { match: "PRL", label: "PRL" }
+    ]
+  },
+  {
+    title: "Tercer semestre",
+    items: [
+      { match: "Química Analítica 1 Laboratorio", label: "Química Analítica 1 Laboratorio" },
+      { match: "Química Analítica 1 Teórico", label: "Química Analítica 1 Teórico" },
+      { match: "Nomenclatura", label: "Nomenclatura" },
+      { match: "Inorgánica Teórico", label: "Química Inorgánica Teórico" },
+      { match: "Inorgánica Laboratorio", label: "Química Inorgánica Laboratorio" },
+      { match: "Matemática 05", label: "Matemática 05" },
+      { match: "Física 102", label: "Física 102" },
+      { match: "Carey", label: "Carey" },
+      { match: "Tratamiento de Datos", label: "Tratamiento de datos" }
+    ]
+  },
+  {
+    title: "Quinto semestre",
+    items: [
+      { match: "Química Analítica 3 Laboratorio", label: "Química Analítica 3 Laboratorio" },
+      { match: "Química Analítica 3 Teórico", label: "Química Analítica 3 Teórico" },
+      { match: "Química Orgánica 103 Laboratorio", label: "Química Orgánica 103 Laboratorio" },
+      { match: "Química Orgánica 104", label: "Orgánica 104" },
+      { match: "Fisicoquímica 103 Laboratorio", label: "Fisicoquímica 103 Laboratorio" },
+      { match: "Fisicoquímica 103 Teórico", label: "Fisicoquímica 103 Teórico" },
+      { match: "Matemática 06", label: "Matemática 06" },
+      { match: "Lehninger", label: "Lehninger" }
+    ]
+  },
+  {
+    title: "Séptimo semestre",
+    items: [
+      { match: "Bacteriología y Micología", label: "Bacteriología y Micología" },
+      { match: "Parasitología", label: "Parasitología" },
+      { match: "SIG", label: "SIG" }
+    ]
+  }
+];
+
+function normalizeText(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export default function PublicShop() {
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
@@ -137,14 +195,66 @@ export default function PublicShop() {
     setEntallada("");
   }
 
+  function getProductDisplayName(product) {
+    if (product.category !== "cuaderneta") {
+      return product.name;
+    }
+
+    const normalizedName = normalizeText(product.name);
+
+    for (const group of CUADERNETA_GROUPS) {
+      const found = group.items.find((item) => {
+        return normalizeText(item.match) === normalizedName;
+      });
+
+      if (found) {
+        return found.label;
+      }
+    }
+
+    return product.name;
+  }
+
   const filteredProducts = products.filter((product) => {
     const sameCategory = product.category === category;
-    const matchesSearch = product.name
+    const matchesSearch = getProductDisplayName(product)
       .toLowerCase()
       .includes(search.toLowerCase());
 
     return sameCategory && matchesSearch;
   });
+
+  const groupedCuadernetas = CUADERNETA_GROUPS.map((group) => {
+    const groupItems = group.items
+      .map((definition) => {
+        const product = products.find((productItem) => {
+          return normalizeText(productItem.name) === normalizeText(definition.match);
+        });
+
+        if (!product) {
+          return null;
+        }
+
+        const matchesSearch =
+          normalizeText(definition.label).includes(normalizeText(search)) ||
+          normalizeText(product.name).includes(normalizeText(search));
+
+        if (!matchesSearch) {
+          return null;
+        }
+
+        return {
+          product,
+          label: definition.label
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      title: group.title,
+      items: groupItems
+    };
+  }).filter((group) => group.items.length > 0);
 
   const total = cart.reduce((sum, product) => {
     return sum + Number(product.price);
@@ -249,6 +359,61 @@ export default function PublicShop() {
     }
   }
 
+  function renderProductCard(product, displayName = product.name) {
+    const remaining = productStockRemaining(product);
+    const sinStock = product.category !== "cuaderneta" && remaining <= 0;
+
+    return (
+      <div
+        key={product.id}
+        className={
+          "flex justify-between items-center gap-4 border border-zinc-200 rounded-2xl p-4 hover:shadow-md transition bg-white " +
+          (sinStock ? "opacity-50" : "")
+        }
+      >
+        {product.image_url && (
+          <img
+            src={"/" + product.image_url}
+            alt={displayName}
+            className="h-20 w-20 object-cover rounded-xl border"
+          />
+        )}
+
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <p className="font-bold text-lg">{displayName}</p>
+
+            <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-100 text-orange-600">
+              {product.category === "cuaderneta"
+                ? "Cuaderneta"
+                : product.category === "tunica"
+                  ? "Túnica"
+                  : "Regla"}
+            </span>
+          </div>
+
+          <p className="text-orange-500 font-black">${product.price}</p>
+
+          {sinStock && (
+            <p className="text-sm text-red-500 font-bold">Sin stock</p>
+          )}
+        </div>
+
+        <button
+          disabled={sinStock}
+          onClick={() => addToCart(product)}
+          className={
+            sinStock
+              ? "bg-zinc-300 text-zinc-600 px-5 py-3 rounded-xl font-bold cursor-not-allowed"
+              : "bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl font-bold"
+          }
+        >
+          {sinStock ? "Sin stock" : "Agregar"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-orange-50 text-zinc-900">
       <button
@@ -333,70 +498,40 @@ export default function PublicShop() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              {filteredProducts.length === 0 && (
-                <p className="text-zinc-500">No hay productos para mostrar.</p>
-              )}
+            <div className="space-y-6">
+              {category === "cuaderneta" ? (
+                <>
+                  {groupedCuadernetas.length === 0 && (
+                    <p className="text-zinc-500">No hay cuadernetas para mostrar.</p>
+                  )}
 
-              {filteredProducts.map((product) => {
-                const remaining = productStockRemaining(product);
-                const sinStock =
-                  product.category !== "cuaderneta" && remaining <= 0;
+                  {groupedCuadernetas.map((group) => (
+                    <section key={group.title}>
+                      <h2 className="text-2xl font-black text-orange-500 mb-3">
+                        {group.title}
+                      </h2>
 
-                return (
-                  <div
-                    key={product.id}
-                    className={
-                      "flex justify-between items-center gap-4 border border-zinc-200 rounded-2xl p-4 hover:shadow-md transition bg-white " +
-                      (sinStock ? "opacity-50" : "")
-                    }
-                  >
-                    {product.image_url && (
-                      <img
-                        src={"/" + product.image_url}
-                        alt={product.name}
-                        className="h-20 w-20 object-cover rounded-xl border"
-                      />
-                    )}
-
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="font-bold text-lg">{product.name}</p>
-
-                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-100 text-orange-600">
-                          {product.category === "cuaderneta"
-                            ? "Cuaderneta"
-                            : product.category === "tunica"
-                              ? "Túnica"
-                              : "Regla"}
-                        </span>
+                      <div className="space-y-3">
+                        {group.items.map(({ product, label }) => {
+                          return renderProductCard(product, label);
+                        })}
                       </div>
+                    </section>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {filteredProducts.length === 0 && (
+                    <p className="text-zinc-500">No hay productos para mostrar.</p>
+                  )}
 
-                      <p className="text-orange-500 font-black">
-                        ${product.price}
-                      </p>
-
-                      {sinStock && (
-                        <p className="text-sm text-red-500 font-bold">
-                          Sin stock
-                        </p>
-                      )}
-                    </div>
-
-                    <button
-                      disabled={sinStock}
-                      onClick={() => addToCart(product)}
-                      className={
-                        sinStock
-                          ? "bg-zinc-300 text-zinc-600 px-5 py-3 rounded-xl font-bold cursor-not-allowed"
-                          : "bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl font-bold"
-                      }
-                    >
-                      {sinStock ? "Sin stock" : "Agregar"}
-                    </button>
+                  <div className="space-y-3">
+                    {filteredProducts.map((product) => {
+                      return renderProductCard(product, product.name);
+                    })}
                   </div>
-                );
-              })}
+                </>
+              )}
             </div>
           </main>
 
@@ -417,7 +552,7 @@ export default function PublicShop() {
                   className="flex justify-between gap-2 border-b border-zinc-200 py-2"
                 >
                   <span>
-                    {item.name} - ${item.price}
+                    {getProductDisplayName(item)} - ${item.price}
                   </span>
 
                   <button
