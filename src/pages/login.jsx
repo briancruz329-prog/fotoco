@@ -18,7 +18,14 @@ export default function Login() {
       return;
     }
 
-    window.location.href = "/admin";
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") || "/admin";
+
+    if (next.startsWith("/")) {
+      window.location.href = next;
+    } else {
+      window.location.href = "/admin";
+    }
   }
 
   return (
