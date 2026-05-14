@@ -14,6 +14,57 @@ function leerBody(req) {
   return req.body;
 }
 
+function todayISOInUruguay() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function addDaysISO(dateISO, days) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function validCuadernetaDates() {
+  const today = todayISOInUruguay();
+  const dates = [];
+
+  for (let i = 2; i <= 7; i++) {
+    dates.push(addDaysISO(today, i));
+  }
+
+  return dates;
+}
+
+async function ensureUpcomingPickupSlots() {
+  const dates = validCuadernetaDates();
+
+  const rows = dates.map((date) => ({
+    pickup_date: date,
+    capacity: 25,
+    reserved: 0,
+    active: true
+  }));
+
+  const { error } = await supabaseAdmin
+    .from("pickup_slots")
+    .upsert(rows, {
+      onConflict: "pickup_date",
+      ignoreDuplicates: true
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return dates;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -24,8 +75,14 @@ export default async function handler(req, res) {
   try {
     const body = leerBody(req);
 
-    const { customerName, customerPhone, customerEmail, items, pickupDate, stampedTunicPickupDate } =
-      body;
+    const {
+      customerName,
+      customerPhone,
+      customerEmail,
+      items,
+      pickupDate,
+      stampedTunicPickupDate
+    } = body;
 
     if (!customerName || !customerPhone || !customerEmail) {
       return res.status(400).json({
@@ -83,25 +140,25 @@ export default async function handler(req, res) {
     });
 
     const hasTunicaEstampada = items.some((item) => {
-  const product = productMap.get(item.name);
+      const product = productMap.get(item.name);
 
-  return (
-    product.category === "tunica" &&
-    product.name.toLowerCase().includes("estampada")
-  );
-});
+      return (
+        product.category === "tunica" &&
+        product.name.toLowerCase().includes("estampada")
+      );
+    });
 
     if (hasCuaderneta && !pickupDate) {
       return res.status(400).json({
         error: "Falta seleccionar fecha de retiro de cuaderneta"
       });
     }
-    
+
     if (hasTunicaEstampada && !stampedTunicPickupDate) {
-  return res.status(400).json({
-    error: "Falta seleccionar fecha de retiro de túnica estampada"
-  });
-}
+      return res.status(400).json({
+        error: "Falta seleccionar fecha de retiro de túnica estampada"
+      });
+    }
 
     for (const [productName, quantity] of Object.entries(counts)) {
       const product = productMap.get(productName);
@@ -120,6 +177,14 @@ export default async function handler(req, res) {
     let slot = null;
 
     if (hasCuaderneta) {
+      const allowedDates = await ensureUpcomingPickupSlots();
+
+      if (!allowedDates.includes(pickupDate)) {
+        return res.status(400).json({
+          error: "La fecha seleccionada para cuaderneta está fuera del rango permitido"
+        });
+      }
+
       const { data: slotData, error: slotError } = await supabaseAdmin
         .from("pickup_slots")
         .select("*")
@@ -129,7 +194,7 @@ export default async function handler(req, res) {
 
       if (slotError || !slotData) {
         return res.status(400).json({
-          error: "La fecha seleccionada no está disponible"
+          error: "La fecha seleccionada para cuaderneta no está disponible"
         });
       }
 
@@ -138,32 +203,29 @@ export default async function handler(req, res) {
 
       if (reserved >= capacity) {
         return res.status(400).json({
-          error: "Cupo completo de cuadernetas para esa fecha"
+          error: "No quedan cupos disponibles para cuadernetas en esa fecha"
         });
       }
 
       slot = slotData;
     }
 
-    let stampedTunicSlot = null;
+    if (hasTunicaEstampada) {
+      const { data: stampedSlotData, error: stampedSlotError } =
+        await supabaseAdmin
+          .from("stamped_tunic_slots")
+          .select("*")
+          .eq("pickup_date", stampedTunicPickupDate)
+          .eq("active", true)
+          .single();
 
-if (hasTunicaEstampada) {
-  const { data: stampedSlotData, error: stampedSlotError } =
-    await supabaseAdmin
-      .from("stamped_tunic_slots")
-      .select("*")
-      .eq("pickup_date", stampedTunicPickupDate)
-      .eq("active", true)
-      .single();
+      if (stampedSlotError || !stampedSlotData) {
+        return res.status(400).json({
+          error: "La fecha seleccionada para túnica estampada no está disponible"
+        });
+      }
+    }
 
-  if (stampedSlotError || !stampedSlotData) {
-    return res.status(400).json({
-      error: "La fecha seleccionada para túnica estampada no está disponible"
-    });
-  }
-
-  stampedTunicSlot = stampedSlotData;
-}
     let total = 0;
 
     const orderItems = items.map((item) => {
@@ -196,7 +258,9 @@ if (hasTunicaEstampada) {
         customer_email: customerEmail,
         total,
         pickup_date: hasCuaderneta ? pickupDate : null,
-stamped_tunic_pickup_date: hasTunicaEstampada ? stampedTunicPickupDate : null,
+        stamped_tunic_pickup_date: hasTunicaEstampada
+          ? stampedTunicPickupDate
+          : null,
         status: "esperando_pago",
         payment_status: "pendiente"
       })
@@ -324,11 +388,13 @@ stamped_tunic_pickup_date: hasTunicaEstampada ? stampedTunicPickupDate : null,
         productos: orderItems.map((item) => item.product_name).join(", "),
         total,
         pickupDate: [
-  hasCuaderneta ? `Cuaderneta: ${pickupDate}` : "",
-  hasTunicaEstampada ? `Túnica estampada: ${stampedTunicPickupDate}` : ""
-]
-  .filter(Boolean)
-  .join(" | "),
+          hasCuaderneta ? `Cuaderneta: ${pickupDate}` : "",
+          hasTunicaEstampada
+            ? `Túnica estampada: ${stampedTunicPickupDate}`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" | "),
         status: "esperando_pago",
         paymentStatus: "pendiente",
         paymentUrl: mpData.init_point,
