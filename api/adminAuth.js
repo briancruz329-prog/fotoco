@@ -5,6 +5,12 @@ export const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+export function getBody(req) {
+  if (!req.body) return {};
+  if (typeof req.body === "string") return JSON.parse(req.body);
+  return req.body;
+}
+
 export async function requireEmployee(req) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace("Bearer ", "");
@@ -13,7 +19,8 @@ export async function requireEmployee(req) {
     throw new Error("No autorizado");
   }
 
-  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  const { data: userData, error: userError } =
+    await supabaseAdmin.auth.getUser(token);
 
   if (userError || !userData?.user?.email) {
     throw new Error("Sesión inválida");
