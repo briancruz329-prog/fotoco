@@ -37,24 +37,20 @@ export default async function handler(req, res) {
     }
 
     let paymentStatus = "pendiente";
-    let orderStatus = "esperando_pago";
 
     if (payment.status === "approved") {
       paymentStatus = "pagado";
-      orderStatus = "pagado";
     } else if (payment.status === "rejected") {
       paymentStatus = "rechazado";
-      orderStatus = "pago_rechazado";
     } else if (payment.status === "pending") {
       paymentStatus = "pendiente";
-      orderStatus = "esperando_pago";
     }
 
     await supabaseAdmin
       .from("orders")
       .update({
         payment_status: paymentStatus,
-        status: orderStatus,
+        payment_method: "Mercado Pago",
         mp_payment_id: String(paymentId)
       })
       .eq("id", orderId);
@@ -80,8 +76,15 @@ export default async function handler(req, res) {
           .map((item) => item.product_name)
           .join(", "),
         total: orderData?.total || 0,
-        pickupDate: orderData?.pickup_date || "",
-        status: orderStatus,
+        pickupDate: [
+          orderData?.pickup_date ? `Cuaderneta: ${orderData.pickup_date}` : "",
+          orderData?.stamped_tunic_pickup_date
+            ? `Túnica estampada: ${orderData.stamped_tunic_pickup_date}`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" | "),
+        status: orderData?.status || "",
         paymentStatus,
         paymentUrl: orderData?.mp_init_point || "",
         preferenceId: orderData?.mp_preference_id || "",

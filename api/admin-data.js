@@ -68,6 +68,10 @@ export default async function handler(req, res) {
       throw ordersError;
     }
 
+    const visibleOrders = (orders || []).filter((order) => {
+      return order.status !== "entregado";
+    });
+
     const { data: items, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select("*");
@@ -108,7 +112,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      orders: orders || [],
+      orders: visibleOrders,
       items: items || [],
       products: products || [],
       slots: slots || [],

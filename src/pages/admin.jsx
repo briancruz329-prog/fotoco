@@ -282,7 +282,7 @@ export default function Admin() {
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
           <h2 className="text-2xl font-black text-orange-500 mb-4">
-            Pedidos
+            Pedidos no entregados
           </h2>
 
           <div className="overflow-auto">
@@ -294,7 +294,7 @@ export default function Admin() {
                   <th className="p-2">Celular</th>
                   <th className="p-2">Productos</th>
                   <th className="p-2">Total</th>
-                  <th className="p-2">Pago</th>
+                  <th className="p-2">Método de pago</th>
                   <th className="p-2">Estado</th>
                   <th className="p-2">Link</th>
                 </tr>
@@ -337,34 +337,34 @@ export default function Admin() {
 
                     <td className="p-2">
                       <select
-                        value={order.payment_status || "pendiente"}
+                        value={order.payment_method || "Mercado Pago"}
                         onChange={(e) =>
-                          updateOrder(order, { payment_status: e.target.value })
+                          updateOrder(order, { payment_method: e.target.value })
                         }
                         className="border rounded-lg p-2"
                       >
-                        <option value="pendiente">pendiente</option>
-                        <option value="pagado">pagado</option>
-                        <option value="rechazado">rechazado</option>
+                        <option value="Mercado Pago">Mercado Pago</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="POS">POS</option>
                       </select>
+
+                      {order.payment_status && (
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Estado MP: {order.payment_status}
+                        </p>
+                      )}
                     </td>
 
                     <td className="p-2">
                       <select
-                        value={order.status || "esperando_pago"}
+                        value={order.status || "no_entregado"}
                         onChange={(e) =>
                           updateOrder(order, { status: e.target.value })
                         }
                         className="border rounded-lg p-2"
                       >
-                        <option value="esperando_pago">esperando_pago</option>
-                        <option value="pagado">pagado</option>
-                        <option value="preparando">preparando</option>
-                        <option value="listo_para_retirar">
-                          listo_para_retirar
-                        </option>
-                        <option value="entregado">entregado</option>
-                        <option value="cancelado">cancelado</option>
+                        <option value="no_entregado">No Entregado</option>
+                        <option value="entregado">Entregado</option>
                       </select>
                     </td>
 
@@ -386,7 +386,7 @@ export default function Admin() {
                 {orders.length === 0 && (
                   <tr>
                     <td className="p-4 text-zinc-500" colSpan="8">
-                      No hay pedidos.
+                      No hay pedidos no entregados.
                     </td>
                   </tr>
                 )}

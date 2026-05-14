@@ -261,8 +261,9 @@ export default async function handler(req, res) {
         stamped_tunic_pickup_date: hasTunicaEstampada
           ? stampedTunicPickupDate
           : null,
-        status: "esperando_pago",
-        payment_status: "pendiente"
+        status: "no_entregado",
+        payment_status: "pendiente",
+        payment_method: "Mercado Pago"
       })
       .select()
       .single();
@@ -360,7 +361,6 @@ export default async function handler(req, res) {
       await supabaseAdmin
         .from("orders")
         .update({
-          status: "error_pago",
           payment_status: "error_creando_pago"
         })
         .eq("id", order.id);
@@ -395,7 +395,7 @@ export default async function handler(req, res) {
         ]
           .filter(Boolean)
           .join(" | "),
-        status: "esperando_pago",
+        status: "no_entregado",
         paymentStatus: "pendiente",
         paymentUrl: mpData.init_point,
         preferenceId: mpData.id,
