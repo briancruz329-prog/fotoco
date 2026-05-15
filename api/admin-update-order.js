@@ -1,8 +1,52 @@
 import { requireEmployee, supabaseAdmin, getBody } from "./adminAuth.js";
 
+function entalladaToBoolean(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  return normalized === "si" || normalized === "true";
+}
+
 async function devolverStockDeItems(items) {
   for (const item of items || []) {
     if (item.category === "cuaderneta") {
+      continue;
+    }
+
+    const cantidad = Number(item.quantity || 1);
+
+    if (item.category === "tunica") {
+      if (!item.talle) {
+        continue;
+      }
+
+      const fitted = entalladaToBoolean(item.entallada);
+
+      const { data: stockRow, error: stockError } = await supabaseAdmin
+        .from("tunic_stock")
+        .select("id, stock")
+        .eq("size", String(item.talle))
+        .eq("fitted", fitted)
+        .single();
+
+      if (stockError || !stockRow) {
+        continue;
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from("tunic_stock")
+        .update({
+          stock: Number(stockRow.stock || 0) + cantidad
+        })
+        .eq("id", stockRow.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
       continue;
     }
 
@@ -20,13 +64,10 @@ async function devolverStockDeItems(items) {
       continue;
     }
 
-    const stockActual = Number(product.stock || 0);
-    const cantidad = Number(item.quantity || 1);
-
     const { error: updateError } = await supabaseAdmin
       .from("products")
       .update({
-        stock: stockActual + cantidad
+        stock: Number(product.stock || 0) + cantidad
       })
       .eq("id", product.id);
 
@@ -131,12 +172,7 @@ export default async function handler(req, res) {
 
     const body = getBody(req);
 
-    const {
-      id,
-      status,
-      payment_status,
-      payment_method
-    } = body;
+    const { id, status, payment_status, payment_method } = body;
 
     if (!id) {
       return res.status(400).json({

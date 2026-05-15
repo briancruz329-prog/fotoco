@@ -42,12 +42,10 @@ async function ensureUpcomingPickupSlots() {
     active: true
   }));
 
-  const { error } = await supabaseAdmin
-    .from("pickup_slots")
-    .upsert(rows, {
-      onConflict: "pickup_date",
-      ignoreDuplicates: true
-    });
+  const { error } = await supabaseAdmin.from("pickup_slots").upsert(rows, {
+    onConflict: "pickup_date",
+    ignoreDuplicates: true
+  });
 
   if (error) {
     throw error;
@@ -89,9 +87,7 @@ export default async function handler(req, res) {
     }
 
     const availablePickupSlots = (pickupSlots || [])
-      .filter((slot) => {
-        return Number(slot.capacity) - Number(slot.reserved) > 0;
-      })
+      .filter((slot) => Number(slot.capacity) - Number(slot.reserved) > 0)
       .map((slot) => ({
         id: slot.id,
         pickup_date: slot.pickup_date
@@ -108,10 +104,22 @@ export default async function handler(req, res) {
       throw stampedSlotsError;
     }
 
+    const { data: tunicStock, error: tunicStockError } = await supabaseAdmin
+      .from("tunic_stock")
+      .select("id, size, fitted, stock")
+      .gt("stock", 0)
+      .order("size", { ascending: true })
+      .order("fitted", { ascending: false });
+
+    if (tunicStockError) {
+      throw tunicStockError;
+    }
+
     return res.status(200).json({
       products: products || [],
       pickupSlots: availablePickupSlots,
-      stampedTunicSlots: stampedTunicSlots || []
+      stampedTunicSlots: stampedTunicSlots || [],
+      tunicStock: tunicStock || []
     });
   } catch (error) {
     console.error("ERROR public-data:", error);
