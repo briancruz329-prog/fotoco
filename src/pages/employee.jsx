@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+const TUNIC_SIZES = ["42", "44", "46", "48", "50", "52", "54", "56"];
+
 const CUADERNETA_GROUPS = [
   {
     title: "Primer semestre",
@@ -97,6 +99,11 @@ function formatDateDDMM(dateISO) {
   return `${day}-${month}`;
 }
 
+function entalladaToBoolean(value) {
+  const normalized = normalizeText(value);
+  return normalized === "si" || normalized === "true";
+}
+
 export default function Employee() {
   const [session, setSession] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -104,6 +111,7 @@ export default function Employee() {
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
   const [stampedTunicSlots, setStampedTunicSlots] = useState([]);
+  const [tunicStock, setTunicStock] = useState([]);
 
   const [cart, setCart] = useState([]);
   const [category, setCategory] = useState("cuaderneta");
@@ -126,6 +134,36 @@ export default function Employee() {
     init();
   }, []);
 
+  useEffect(() => {
+    const tunicaCount = cart.filter((product) => product.category === "tunica").length;
+
+    if (tunicaCount === 0) {
+      setTalle("");
+      setEntallada("");
+      return;
+    }
+
+    if (talle) {
+      const stockSi = getTunicStock(talle, true);
+      const stockNo = getTunicStock(talle, false);
+
+      if (stockSi < tunicaCount && stockNo < tunicaCount) {
+        setTalle("");
+        setEntallada("");
+        return;
+      }
+    }
+
+    if (talle && entallada) {
+      const fitted = entalladaToBoolean(entallada);
+      const stock = getTunicStock(talle, fitted);
+
+      if (stock < tunicaCount) {
+        setEntallada("");
+      }
+    }
+  }, [cart, talle, entallada, tunicStock]);
+
   async function init() {
     const { data } = await supabase.auth.getSession();
 
@@ -142,7 +180,17 @@ export default function Employee() {
   async function loadData() {
     try {
       const response = await fetch("/api/public-data");
-      const data = await response.json();
+      const text = await response.text();
+
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.error("Respuesta no JSON:", text);
+        alert("El servidor no respondió JSON al cargar datos");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Error cargando datos");
@@ -151,10 +199,52 @@ export default function Employee() {
       setProducts(data.products || []);
       setSlots(data.pickupSlots || []);
       setStampedTunicSlots(data.stampedTunicSlots || []);
+      setTunicStock(data.tunicStock || []);
     } catch (error) {
       console.error(error);
       alert("Error cargando productos");
     }
+  }
+
+  function getTunicStock(size, fitted) {
+    const found = tunicStock.find((row) => {
+      return String(row.size) === String(size) && Boolean(row.fitted) === Boolean(fitted);
+    });
+
+    return Number(found?.stock || 0);
+  }
+
+  function getTotalTunicStock() {
+    return tunicStock.reduce((sum, row) => {
+      return sum + Number(row.stock || 0);
+    }, 0);
+  }
+
+  function getAvailableTunicSizes(quantity) {
+    return TUNIC_SIZES.filter((size) => {
+      const stockSi = getTunicStock(size, true);
+      const stockNo = getTunicStock(size, false);
+
+      return stockSi >= quantity || stockNo >= quantity;
+    });
+  }
+
+  function getAvailableFittedOptions(size, quantity) {
+    if (!size) {
+      return [];
+    }
+
+    const options = [];
+
+    if (getTunicStock(size, true) >= quantity) {
+      options.push("Sí");
+    }
+
+    if (getTunicStock(size, false) >= quantity) {
+      options.push("No");
+    }
+
+    return options;
   }
 
   function productStockRemaining(product) {
@@ -162,12 +252,36 @@ export default function Employee() {
       return 999999;
     }
 
+    if (product.category === "tunica") {
+      return getTotalTunicStock();
+    }
+
     const inCart = cart.filter((item) => item.id === product.id).length;
     return Number(product.stock || 0) - inCart;
   }
 
   function addToCart(product) {
-    if (product.category !== "cuaderneta") {
+    if (product.category === "tunica") {
+      if (getTotalTunicStock() <= 0) {
+        alert("No hay stock disponible de túnicas");
+        return;
+      }
+
+      const nextTunicaCount =
+        cart.filter((item) => item.category === "tunica").length + 1;
+
+      if (talle && entallada) {
+        const fitted = entalladaToBoolean(entallada);
+        const selectedStock = getTunicStock(talle, fitted);
+
+        if (selectedStock < nextTunicaCount) {
+          alert("No hay suficiente stock para ese talle y tipo de túnica");
+          return;
+        }
+      }
+    }
+
+    if (product.category !== "cuaderneta" && product.category !== "tunica") {
       const remaining = productStockRemaining(product);
 
       if (remaining <= 0) {
@@ -221,7 +335,19 @@ export default function Employee() {
       .toLowerCase()
       .includes(search.toLowerCase());
 
-    return sameCategory && matchesSearch;
+    if (!sameCategory || !matchesSearch) {
+      return false;
+    }
+
+    if (product.category === "tunica") {
+      return getTotalTunicStock() > 0;
+    }
+
+    if (product.category !== "cuaderneta") {
+      return productStockRemaining(product) > 0;
+    }
+
+    return true;
   });
 
   const groupedCuadernetas = CUADERNETA_GROUPS.map((group) => {
@@ -260,7 +386,8 @@ export default function Employee() {
     return sum + Number(product.price);
   }, 0);
 
-  const hasTunica = cart.some((product) => product.category === "tunica");
+  const tunicaCount = cart.filter((product) => product.category === "tunica").length;
+  const hasTunica = tunicaCount > 0;
 
   const hasCuaderneta = cart.some((product) => {
     return product.category === "cuaderneta";
@@ -272,6 +399,9 @@ export default function Employee() {
       product.name.toLowerCase().includes("estampada")
     );
   });
+
+  const availableTunicSizes = getAvailableTunicSizes(tunicaCount || 1);
+  const availableFittedOptions = getAvailableFittedOptions(talle, tunicaCount || 1);
 
   async function submitOrder(paymentStatus) {
     if (cart.length === 0) {
@@ -297,6 +427,16 @@ export default function Employee() {
     if (hasTunica && (!talle || !entallada)) {
       alert("Completá talle y si la túnica es entallada");
       return;
+    }
+
+    if (hasTunica) {
+      const fitted = entalladaToBoolean(entallada);
+      const stock = getTunicStock(talle, fitted);
+
+      if (stock < tunicaCount) {
+        alert("No hay stock suficiente para ese talle y tipo de túnica");
+        return;
+      }
     }
 
     const items = cart.map((product) => {
@@ -619,28 +759,34 @@ export default function Employee() {
 
                   <select
                     value={talle}
-                    onChange={(e) => setTalle(e.target.value)}
+                    onChange={(e) => {
+                      setTalle(e.target.value);
+                      setEntallada("");
+                    }}
                     className="w-full border rounded-xl px-4 py-3 mb-3"
                   >
                     <option value="">Seleccionar talle</option>
-                    <option>42</option>
-                    <option>44</option>
-                    <option>46</option>
-                    <option>48</option>
-                    <option>50</option>
-                    <option>52</option>
-                    <option>54</option>
-                    <option>56</option>
+
+                    {availableTunicSizes.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
                   </select>
 
                   <select
                     value={entallada}
                     onChange={(e) => setEntallada(e.target.value)}
                     className="w-full border rounded-xl px-4 py-3"
+                    disabled={!talle}
                   >
                     <option value="">¿Entallada?</option>
-                    <option>Sí</option>
-                    <option>No</option>
+
+                    {availableFittedOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}

@@ -38,18 +38,104 @@ async function ensureUpcomingPickupSlots() {
     active: true
   }));
 
-  const { error } = await supabaseAdmin
-    .from("pickup_slots")
-    .upsert(rows, {
-      onConflict: "pickup_date",
-      ignoreDuplicates: true
-    });
+  const { error } = await supabaseAdmin.from("pickup_slots").upsert(rows, {
+    onConflict: "pickup_date",
+    ignoreDuplicates: true
+  });
 
   if (error) {
     throw error;
   }
 
   return dates;
+}
+
+function entalladaToBoolean(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  return normalized === "si" || normalized === "true";
+}
+
+function buildTunicCounts(items, productMap) {
+  const counts = {};
+
+  for (const item of items) {
+    const product = productMap.get(item.name);
+
+    if (product.category !== "tunica") {
+      continue;
+    }
+
+    if (!item.talle || !item.entallada) {
+      throw new Error("Falta talle o entallada en túnica");
+    }
+
+    const fitted = entalladaToBoolean(item.entallada);
+    const key = `${item.talle}|${fitted}`;
+
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  return counts;
+}
+
+async function validateAndDiscountTunicStock(tunicCounts) {
+  for (const [key, quantity] of Object.entries(tunicCounts)) {
+    const [size, fittedText] = key.split("|");
+    const fitted = fittedText === "true";
+
+    const { data: stockRow, error: stockError } = await supabaseAdmin
+      .from("tunic_stock")
+      .select("id, stock")
+      .eq("size", size)
+      .eq("fitted", fitted)
+      .single();
+
+    if (stockError || !stockRow) {
+      throw new Error(`No hay stock configurado para túnica talle ${size}`);
+    }
+
+    const stockDisponible = Number(stockRow.stock || 0);
+
+    if (stockDisponible < quantity) {
+      throw new Error(
+        `Sin stock suficiente de túnica talle ${size} ${
+          fitted ? "entallada" : "no entallada"
+        }`
+      );
+    }
+  }
+
+  for (const [key, quantity] of Object.entries(tunicCounts)) {
+    const [size, fittedText] = key.split("|");
+    const fitted = fittedText === "true";
+
+    const { data: stockRow, error: stockError } = await supabaseAdmin
+      .from("tunic_stock")
+      .select("id, stock")
+      .eq("size", size)
+      .eq("fitted", fitted)
+      .single();
+
+    if (stockError || !stockRow) {
+      throw new Error(`No se pudo leer stock de túnica talle ${size}`);
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("tunic_stock")
+      .update({
+        stock: Number(stockRow.stock || 0) - Number(quantity)
+      })
+      .eq("id", stockRow.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -166,10 +252,12 @@ export default async function handler(req, res) {
       });
     }
 
+    const tunicCounts = buildTunicCounts(items, productMap);
+
     for (const [productName, quantity] of Object.entries(counts)) {
       const product = productMap.get(productName);
 
-      if (product.category !== "cuaderneta") {
+      if (product.category !== "cuaderneta" && product.category !== "tunica") {
         const stockDisponible = Number(product.stock || 0);
 
         if (stockDisponible < quantity) {
@@ -179,6 +267,8 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    await validateAndDiscountTunicStock(tunicCounts);
 
     let slot = null;
 
@@ -296,7 +386,7 @@ export default async function handler(req, res) {
     for (const [productName, quantity] of Object.entries(counts)) {
       const product = productMap.get(productName);
 
-      if (product.category !== "cuaderneta") {
+      if (product.category !== "cuaderneta" && product.category !== "tunica") {
         const newStock = Number(product.stock || 0) - Number(quantity);
 
         const { error: stockError } = await supabaseAdmin

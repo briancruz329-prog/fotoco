@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+const TUNIC_SIZES = ["42", "44", "46", "48", "50", "52", "54", "56"];
+
 export default function Admin() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -10,6 +12,7 @@ export default function Admin() {
   const [products, setProducts] = useState([]);
   const [slots, setSlots] = useState([]);
   const [stampedTunicSlots, setStampedTunicSlots] = useState([]);
+  const [tunicStock, setTunicStock] = useState([]);
 
   const [newSlotDate, setNewSlotDate] = useState("");
   const [newSlotCapacity, setNewSlotCapacity] = useState(25);
@@ -94,6 +97,7 @@ export default function Admin() {
     setProducts(data.products || []);
     setSlots(data.slots || []);
     setStampedTunicSlots(data.stampedTunicSlots || []);
+    setTunicStock(data.tunicStock || []);
   }
 
   async function logout() {
@@ -199,6 +203,23 @@ export default function Admin() {
     }
   }
 
+  async function updateTunicStock(size, fitted, stock) {
+    try {
+      await apiFetch("/api/admin-update-tunic-stock", {
+        method: "POST",
+        body: JSON.stringify({
+          size,
+          fitted,
+          stock: Number(stock)
+        })
+      });
+
+      await loadAdminData();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
   async function updateOrder(order, patch) {
     const vaARechazar = patch.payment_status === "rechazado";
     const vaAEntregar = patch.status === "entregado";
@@ -213,7 +234,7 @@ export default function Admin() {
 
     if (vaAEntregar) {
       const ok = window.confirm(
-        "Esto marcará el pedido como entregado y lo eliminará de la lista. No se devolverá stock ni cupo. ¿Confirmás?"
+        "Esto marcará el pedido como entregado y lo eliminará. No se devolverá stock ni cupo. ¿Confirmás?"
       );
 
       if (!ok) return;
@@ -257,6 +278,14 @@ export default function Admin() {
       .join(", ");
   }
 
+  function getTunicStock(size, fitted) {
+    const found = tunicStock.find((row) => {
+      return String(row.size) === String(size) && Boolean(row.fitted) === Boolean(fitted);
+    });
+
+    return Number(found?.stock || 0);
+  }
+
   function formatStatus(status) {
     if (status === "entregado") return "Entregado";
     return "No Entregado";
@@ -290,28 +319,31 @@ export default function Admin() {
           </div>
 
           <div className="flex gap-3 flex-wrap">
-  <button
-    onClick={refresh}
-    className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold"
-  >
-    Actualizar
-  </button>
+            <button
+              onClick={refresh}
+              className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold"
+            >
+              Actualizar
+            </button>
 
-  <a href="/employee" className="bg-orange-100 text-orange-600 px-4 py-3 rounded-xl font-bold">
-    Crear pedido
-  </a>
+            <a
+              href="/employee"
+              className="bg-orange-100 text-orange-600 px-4 py-3 rounded-xl font-bold"
+            >
+              Crear pedido empleado
+            </a>
 
-  <a href="/" className="bg-zinc-200 px-4 py-3 rounded-xl font-bold">
-    Ver tienda
-  </a>
+            <a href="/" className="bg-zinc-200 px-4 py-3 rounded-xl font-bold">
+              Ver tienda
+            </a>
 
-  <button
-    onClick={logout}
-    className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold"
-  >
-    Salir
-  </button>
-</div>
+            <button
+              onClick={logout}
+              className="bg-zinc-900 text-white px-4 py-3 rounded-xl font-bold"
+            >
+              Salir
+            </button>
+          </div>
         </header>
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
@@ -454,7 +486,7 @@ export default function Admin() {
 
         <section className="bg-white rounded-3xl shadow p-6 mb-8">
           <h2 className="text-2xl font-black text-orange-500 mb-4">
-            Productos, precios y stock
+            Productos y precios
           </h2>
 
           <div className="overflow-auto">
@@ -512,6 +544,10 @@ export default function Admin() {
                     <td className="p-2">
                       {product.category === "cuaderneta" ? (
                         <span className="text-zinc-500">usa cupo diario</span>
+                      ) : product.category === "tunica" ? (
+                        <span className="text-zinc-500">
+                          usa stock por talle
+                        </span>
                       ) : (
                         <input
                           type="number"
@@ -537,6 +573,69 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-3xl shadow p-6 mb-8">
+          <h2 className="text-2xl font-black text-orange-500 mb-2">
+            Stock interno de túnicas
+          </h2>
+
+          <p className="text-zinc-600 mb-4">
+            Este stock es compartido por túnica normal, túnica estampada de química
+            y túnica estampada de medicina. Se descuenta según talle y si es entallada.
+          </p>
+
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b">
+                  <th className="p-2">Talle</th>
+                  <th className="p-2">Entallada Sí</th>
+                  <th className="p-2">Entallada No</th>
+                  <th className="p-2">Total talle</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {TUNIC_SIZES.map((size) => {
+                  const stockSi = getTunicStock(size, true);
+                  const stockNo = getTunicStock(size, false);
+
+                  return (
+                    <tr key={size} className="border-b">
+                      <td className="p-2 font-bold">{size}</td>
+
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          defaultValue={stockSi}
+                          className="border rounded-lg p-2 w-24"
+                          onBlur={(e) =>
+                            updateTunicStock(size, true, e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          defaultValue={stockNo}
+                          className="border rounded-lg p-2 w-24"
+                          onBlur={(e) =>
+                            updateTunicStock(size, false, e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td className="p-2 font-bold">
+                        {Number(stockSi) + Number(stockNo)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
