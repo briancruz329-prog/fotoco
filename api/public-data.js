@@ -21,12 +21,24 @@ function addDaysISO(dateISO, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function isWeekendISO(dateISO) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = date.getUTCDay();
+
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
 function upcomingCuadernetaDates() {
   const today = todayISOInUruguay();
   const dates = [];
 
-  for (let i = 2; i <= 7; i++) {
-    dates.push(addDaysISO(today, i));
+  for (let i = 2; i <= 14; i++) {
+    const dateISO = addDaysISO(today, i);
+
+    if (!isWeekendISO(dateISO)) {
+      dates.push(dateISO);
+    }
   }
 
   return dates;

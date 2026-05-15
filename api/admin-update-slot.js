@@ -107,7 +107,7 @@ export default async function handler(req, res) {
     const { error } = await supabaseAdmin.from("pickup_slots").upsert(
       {
         pickup_date,
-        capacity: Number(capacity || 25),
+        capacity: Number(capacity || 40),
         reserved: 0,
         active: active !== false
       },

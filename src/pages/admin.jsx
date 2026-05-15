@@ -15,7 +15,7 @@ export default function Admin() {
   const [tunicStock, setTunicStock] = useState([]);
 
   const [newSlotDate, setNewSlotDate] = useState("");
-  const [newSlotCapacity, setNewSlotCapacity] = useState(25);
+  const [newSlotCapacity, setNewSlotCapacity] = useState(40);
 
   const [newStampedDate, setNewStampedDate] = useState("");
 
@@ -158,7 +158,7 @@ export default function Admin() {
       });
 
       setNewSlotDate("");
-      setNewSlotCapacity(25);
+      setNewSlotCapacity(40);
       await loadAdminData();
     } catch (error) {
       alert(error.message);

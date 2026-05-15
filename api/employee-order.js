@@ -33,7 +33,7 @@ async function ensureUpcomingPickupSlots() {
 
   const rows = dates.map((date) => ({
     pickup_date: date,
-    capacity: 25,
+    capacity: 40,
     reserved: 0,
     active: true
   }));
