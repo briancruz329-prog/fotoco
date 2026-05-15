@@ -679,7 +679,7 @@ export default function PublicShop() {
               ) : (
                 <>
                   {filteredProducts.length === 0 && (
-                    <p className="text-zinc-500">No hay productos para mostrar.</p>
+                    <p className="text-zinc-500">No hay stock de este producto :(</p>
                   )}
 
                   <div className="space-y-3">
